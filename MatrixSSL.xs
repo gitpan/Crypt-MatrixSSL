@@ -3,21 +3,12 @@
 #include "XSUB.h"
 
 #include "ppport.h"
-
-#include "const-c.inc"
-#include "matrixssl/matrixSsl.h"
+#include "mxSsl.h"
 
 
-MODULE = Crypt::MatrixSSL		PACKAGE = Crypt::MatrixSSL
 
 
-INCLUDE: const-xs.inc
-
-
-void
-mx_hello()
-    CODE:
-        printf("Hello, world!\n");
+MODULE = Crypt::MatrixSSL		PACKAGE = Crypt::MatrixSSL		
 
 
 
@@ -25,7 +16,6 @@ mx_hello()
 
 =head2 matrixSslOpen
 
-/*		PREFIX = mx_ */
 Prototype
 int matrixSslOpen();
 
@@ -52,6 +42,8 @@ matrixSslOpen()
         RETVAL = matrixSslOpen();
     OUTPUT:
         RETVAL
+
+
 
 
 
@@ -1032,4 +1024,3 @@ hello()
 That's the end of this .xs file.
 
 =cut
-

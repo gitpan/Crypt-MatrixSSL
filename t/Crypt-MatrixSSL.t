@@ -38,12 +38,12 @@ print "matrixSslOpen() returns '$rc'\n" if($cdbg);
 
 
 # Tell it where our key files are
-my $skeyfile = "/tmp/mxprivkeySrv.pem";
-my $ckeyfile = "/tmp/mxprivkeyCln.pem";
-my $scertfile= "/tmp/mxcertSrv.pem";
-my $ccertfile= "/tmp/mxcertCln.pem";
-my $sCAfile  = "/tmp/mxCAcertCln.pem";
-my $cCAfile  = "/tmp/mxCAcertSrv.pem";
+my $skeyfile = "mxprivkeySrv.pem";
+my $ckeyfile = "mxprivkeyCln.pem";
+my $scertfile = "mxcertSrv.pem";
+my $ccertfile = "mxcertCln.pem";
+my $sCAfile = "mxCAcertCln.pem";
+my $cCAfile = "mxCAcertSrv.pem";
 ok(&MakeKeys()==0,'MakeKeys');
 my $smxkeys=333;
 $rc=333;
@@ -155,13 +155,13 @@ while((($hc=Crypt::MatrixSSL::matrixSslHandshakeIsComplete($sssl))!=1)&&($trymor
 $rc=333;
 $rc=Crypt::MatrixSSL::matrixSslHandshakeIsComplete($cssl);
 ok($rc==1, 'matrixSslHandshakeIsComplete1');						# test x
-print "matrixSslHandshakeIsComplete('$cssl') returns '$rc'\n";
+print "matrixSslHandshakeIsComplete('$cssl') returns '$rc'\n"  if($cdbg);
 
 # We now deliberately check that it knows the handshake is not complete
 $rc=333;
 $rc=Crypt::MatrixSSL::matrixSslHandshakeIsComplete($sssl);
 ok($rc==1, 'matrixSslHandshakeIsComplete2');						# test x
-print "matrixSslHandshakeIsComplete('$sssl') returns '$rc'\n";
+print "matrixSslHandshakeIsComplete('$sssl') returns '$rc'\n"  if($cdbg);
 
 
 
@@ -213,7 +213,7 @@ print "matrixSslFreeSessionId($cout)=$rc\n"  if($cdbg);
 $rc=333;
 $cout='';
 $rc=Crypt::MatrixSSL::matrixSslEncodeClosureAlert($cssl, $cout);
-print "matrixSslEncodeClosureAlert($cssl, $cout)='$rc'\n";
+print "matrixSslEncodeClosureAlert($cssl, $cout)='$rc'\n"  if($cdbg);
 $rc=Crypt::MatrixSSL::matrixSslDecode($sssl, $cout, $sout, $error, $alertLevel, $alertDescription); # send it
 ok($rc==Crypt::MatrixSSL::mxSSL_ALERT,'matrixSslFreeSessionId');		# test
 
@@ -226,21 +226,28 @@ ok($rc==Crypt::MatrixSSL::mxSSL_ALERT,'matrixSslFreeSessionId');		# test
 $rc=333;
 $rc=Crypt::MatrixSSL::matrixSslDeleteSession($cssl);
 ok($rc==0,'matrixSslDeleteSession');		# test ??
-print "matrixSslDeleteSession($cssl)='$rc'\n";
+print "matrixSslDeleteSession($cssl)='$rc'\n"  if($cdbg);
 
 $rc=333;
 $rc=Crypt::MatrixSSL::matrixSslDeleteSession($sssl);
 ok($rc==0,'matrixSslDeleteSession2');		# test ??
-print "matrixSslDeleteSession($sssl)='$rc'\n";
+print "matrixSslDeleteSession($sssl)='$rc'\n"  if($cdbg);
 
 # Free our keys
 $rc=Crypt::MatrixSSL::matrixSslFreeKeys($smxkeys);
-print "matrixSslFreeKeys($smxkeys)=$rc\n";
+print "matrixSslFreeKeys($smxkeys)=$rc\n"  if($cdbg);
 $rc=Crypt::MatrixSSL::matrixSslFreeKeys($cmxkeys);
-print "matrixSslFreeKeys($cmxkeys)=$rc\n";
+print "matrixSslFreeKeys($cmxkeys)=$rc\n"  if($cdbg);
 
 # Tidy up
 Crypt::MatrixSSL::matrixSslClose();
+
+unlink($skeyfile);
+unlink($ckeyfile);
+unlink($scertfile);
+unlink($ccertfile);
+unlink($sCAfile);
+unlink($cCAfile);
 
 #end
 exit(0);
@@ -267,7 +274,7 @@ sub showme {
 # Create the key files for testing with
 sub MakeKeys {
 
-open(PEM,">/tmp/mxprivkeySrv.pem");
+open(PEM,">$skeyfile");
 print PEM q ~-----BEGIN RSA PRIVATE KEY-----
 MIICWwIBAAKBgQDd5a6/JzURVbrPRc0H445n2JhcHRCiU7AKXCmLrOvr07kQRF+S
 lN4iLIK7l0ksTU6bFagbJ56NOHkjgGcVoTN/Qp3jeFPAsJ8BUB0oiCat9y6vwyGF
@@ -285,7 +292,7 @@ fp2V6yZuKqt0okYUNahhuenYDSUbErPS8pe0gV20eQ==
 -----END RSA PRIVATE KEY-----
 ~;
 close(PEM);
-open(PEM,">/tmp/mxcertSrv.pem");
+open(PEM,">$scertfile");
 print PEM q ~Certificate:
     Data:
         Version: 3 (0x2)
@@ -341,7 +348,7 @@ m2iui5Mell9vdFRQXJ9/O8li5Pe+b83RMQ==
 -----END CERTIFICATE-----
 ~;
 close(PEM);
-open(PEM,">/tmp/mxCAcertCln.pem");
+open(PEM,">$sCAfile");
 print PEM q ~-----BEGIN CERTIFICATE-----
 MIICoDCCAgmgAwIBAgIBADANBgkqhkiG9w0BAQQFADCBjDEXMBUGA1UEAxMOQWNt
 ZSBTYW1wbGUgQ0ExFTATBgNVBAgTDFJob2RlIElzbGFuZDELMAkGA1UEBhMCVVMx
@@ -361,7 +368,7 @@ WPLjqA==
 -----END CERTIFICATE-----
 ~;
 close(PEM);
-open(PEM,">/tmp/mxCAcertSrv.pem");
+open(PEM,">$cCAfile");
 print PEM q ~-----BEGIN CERTIFICATE-----
 MIICsjCCAhugAwIBAgIBADANBgkqhkiG9w0BAQQFADCBlTEaMBgGA1UEAxMRUGVl
 clNlYyBTYW1wbGUgQ0ExEzARBgNVBAgTCldhc2hpbmd0b24xCzAJBgNVBAYTAlVT
@@ -381,7 +388,7 @@ RepGD+pOov+ZreAg41ahXVF0dTDQpA==
 -----END CERTIFICATE-----
 ~;
 close(PEM);
-open(PEM,">/tmp/mxcertCln.pem");
+open(PEM,">$ccertfile");
 print PEM q ~Certificate:
     Data:
         Version: 3 (0x2)
@@ -440,7 +447,7 @@ tk1HIQ==
 -----END CERTIFICATE-----
 ~;
 close(PEM);
-open(PEM,">/tmp/mxprivkeyCln.pem");
+open(PEM,">$ckeyfile");
 print PEM q ~-----BEGIN RSA PRIVATE KEY-----
 MIICXAIBAAKBgQDH45+6BmlPf1jqbRQPhPYh5kQX7rY1hBkTmJEOFVRdYpPV3VIf
 4DZ9cVKWGDro3Y9fi0tnonAznQaMWhAOqEIaii6PMkTY/qgKbp6fiNZ/OlcS5nOW

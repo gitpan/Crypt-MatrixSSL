@@ -7,10 +7,8 @@ able to easily write SSL and TLS client and server programs.
 
 MatrixSSL includes everything you need, all in under 50KB.
 
-You will need a "C" compiler to build this on Mac/Linux and it 
-should build on (at least) Windows, Linux, and Macintosh machines.
-The pre-built Windows DLL is also included for Win32 users with
-no compiler.
+You will need a "C" compiler to build this, and it should build on
+(at least) Windows, Linux, and Macintosh machines.
 
 MatrixSSL is an Open Source (GNU Public License) product, and is
 also available commercially if you need freedom from GNU rules.
@@ -31,7 +29,6 @@ To install this module type the following:
 DEPENDENCIES
 
 This module requires no other modules or libraries:
-(the ./matrixssl/ tree is included, and is from matrixssl.org
 
 COPYRIGHT AND LICENCE
 
@@ -46,8 +43,4 @@ This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself, either Perl version 5.8.3 or,
 at your option, any later version of Perl 5 you may have available.
 
-
-Please contact me if you're having problems building, I can
-no doubt help you, then fix this distribution so nobody else has
-the same problems.
 

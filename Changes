@@ -1,0 +1,13 @@
+Revision history for Perl extension Crypt::MatrixSSL.
+
+0.01  Mon Jan 17 21:59:03 2005
+	- original version; created by h2xs 1.23 with options
+		--compat-version=5.6.0 -A -n Crypt::MatrixSSL
+
+0.02  Wed Feb 02 23:03:00 2005
+	- Corrected Makefile.PL to compile cleanly on Win32, Linux, and Macintosh - with generous help from Randy Kobes
+	- cleaned up the testing script
+	- included a sample script "mxgg.pl" which demonstrates getting data from an SSL web server
+	- fixed some documentation
+		
+
