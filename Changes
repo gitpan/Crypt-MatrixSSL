@@ -13,3 +13,9 @@ Revision history for Perl extension Crypt::MatrixSSL.
 0.03  Thu Feb 03 15:42:00 2005
 	- Fixed the POD doc in MatrixSSL.pm to remove some commented-out code.
 	- included the (accidentally omitted in 0.02) source from "matrixssl-1-2-2.zip"
+
+0.04  Fri Feb  4 12:35:58 GMT 2005
+	- Some Win32 VC installs failed to compile without a define
+	- Some Linux installs failed to test without a library
+	- My Windows PC destroyed the CaSe of some important files during "make dist"
+

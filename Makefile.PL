@@ -1,5 +1,8 @@
 use 5.00001;
 use ExtUtils::MakeMaker;
+#
+#  WARNING: Do not try to "make dist" under Windows; it destroys the Upper/lower CaSe of some files.
+#
 # See lib/ExtUtils/MakeMaker.pm for details of how to influence
 # the contents of the Makefile that is written.
 #
@@ -30,7 +33,10 @@ libmatrixssl.lib: matrixssl/src/Makefile $mxc
 
 }
 
-my $defines = ($^O =~ /Win32/) ? '' : '-DLINUX';
+# The MatrixSSL code requires _WIN32_WINNT=0x0400 in order to correctly pick up the wincrypt.h header
+my $defines = ($^O =~ /Win32/) ? '/D_WIN32_WINNT=0x0400' : '-DLINUX';
+# Some Linicies seem to require '-lpthread' - if you're having problems, try removing this:-
+my $libs = ($^O =~ /Win32/) ? '' : '-lpthread';
 WriteMakefile(
     'NAME'		=> 'Crypt::MatrixSSL',
     'VERSION_FROM'	=> 'MatrixSSL.pm', # finds $VERSION
@@ -38,7 +44,7 @@ WriteMakefile(
     ($] >= 5.005 ?    ## Add these new keywords supported since 5.005
       (ABSTRACT_FROM => 'MatrixSSL.pm', # retrieve abstract from module
        AUTHOR     => 'C. N. Drake <christopher@pobox.com>') : ()),
-    'LIBS'		=> [''], # e.g., '-lm'
+    'LIBS'		=> [$libs], # e.g., '-lm'
     'DEFINE'		=> $defines, # e.g., '-DHAVE_SOMETHING'
     'INC'		=> '-I.', # e.g., '-I. -I/usr/include/other'
 	# Un-comment this if you add C files to link with later:
