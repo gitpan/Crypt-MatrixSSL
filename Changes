@@ -10,4 +10,6 @@ Revision history for Perl extension Crypt::MatrixSSL.
 	- included a sample script "mxgg.pl" which demonstrates getting data from an SSL web server
 	- fixed some documentation
 		
-
+0.03  Thu Feb 03 15:42:00 2005
+	- Fixed the POD doc in MatrixSSL.pm to remove some commented-out code.
+	- included the (accidentally omitted in 0.02) source from "matrixssl-1-2-2.zip"

@@ -28,7 +28,7 @@ our @EXPORT = qw(
 	
 );
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 require XSLoader;
 XSLoader::load('Crypt::MatrixSSL', $VERSION);
@@ -43,23 +43,20 @@ use constant mxSSL_PROCESS_DATA	=> -5;	#/* succesfully decoded application data 
 use constant mxSSL_ALERT		=> -6;	#/* we've decoded an alert */
 use constant mxSSL_FILE_NOT_FOUND	=> -7;	#/* File not found */
 
-=head2 old
-
-BEGIN {
-
-  our %MX_RC=( # /* Return codes from public apis. Not all apis return all codes.  See documentation for more details.  */
-	  'SSL_SUCCESS'		=>  0,	#/* Generic success */
-	  'SSL_ERROR'		=> -1,	#/* generic ssl error, see error code */
-	  'SSL_FULL'		=> -2,	#/* must call sslRead before decoding */
-	  'SSL_PARTIAL'		=> -3,	#/* more data reqired to parse full msg */
-	  'SSL_SEND_RESPONSE'	=> -4,	#/* decode produced output data */
-	  'SSL_PROCESS_DATA'	=> -5,	#/* succesfully decoded application data */
-	  'SSL_ALERT'		=> -6,	#/* we've decoded an alert */
-	  'SSL_FILE_NOT_FOUND'	=> -7	#/* File not found */
-	 );
-}
-
-=cut
+# Old:-
+# BEGIN {
+# 
+#   our %MX_RC=( # /* Return codes from public apis. Not all apis return all codes.  See documentation for more details.  */
+# 	  'SSL_SUCCESS'		=>  0,	#/* Generic success */
+# 	  'SSL_ERROR'		=> -1,	#/* generic ssl error, see error code */
+# 	  'SSL_FULL'		=> -2,	#/* must call sslRead before decoding */
+# 	  'SSL_PARTIAL'		=> -3,	#/* more data reqired to parse full msg */
+# 	  'SSL_SEND_RESPONSE'	=> -4,	#/* decode produced output data */
+# 	  'SSL_PROCESS_DATA'	=> -5,	#/* succesfully decoded application data */
+# 	  'SSL_ALERT'		=> -6,	#/* we've decoded an alert */
+# 	  'SSL_FILE_NOT_FOUND'	=> -7	#/* File not found */
+# 	 );
+# }
 
 1;
 __END__
