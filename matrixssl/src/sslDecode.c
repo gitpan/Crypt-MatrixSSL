@@ -1,11 +1,11 @@
 /*
  *	sslDecode.c
- *	Release $Name: MATRIXSSL_1_2_2_OPEN $
+ *	Release $Name: MATRIXSSL_1_2_4_OPEN $
  *
  *	Secure Sockets Layer message decoding
  */
 /*
- *	Copyright (c) PeerSec Networks, 2002-2004. All Rights Reserved.
+ *	Copyright (c) PeerSec Networks, 2002-2005. All Rights Reserved.
  *	The latest version of this code is available at http://www.matrixssl.org
  *
  *	This software is open source; you can redistribute it and/or modify
@@ -35,19 +35,19 @@
 
 #define SSL_MAX_IGNORED_MESSAGE_COUNT	1024
 
-static int parseSSLHandshake(ssl_t *ssl, char *inbuf, int len);
+static int32 parseSSLHandshake(ssl_t *ssl, char *inbuf, int32 len);
 
 /******************************************************************************/
 /*
 	Parse incoming data per http://wp.netscape.com/eng/ssl3
 */
-int matrixSslDecode(ssl_t *ssl, sslBuf_t *in, sslBuf_t *out, 
+int32 matrixSslDecode(ssl_t *ssl, sslBuf_t *in, sslBuf_t *out, 
 						   unsigned char *error, unsigned char *alertLevel, 
 						   unsigned char *alertDescription)
 {
 	unsigned char	*c, *p, *end, *pend, *oend;
 	unsigned char	*mac, macError;
-	int				rc;
+	int32			rc;
 	unsigned char	padLen;
 /*
 	If we've had a protocol error, don't allow further use of the session
@@ -247,7 +247,7 @@ decodeMore:
 		Clear the mac in the callers buffer if we're successful
 */
 		if (ssl->verifyMac(ssl, ssl->rec.type, out->end, 
-			(int)(mac - out->end), mac) < 0 || macError) {
+				(int32)(mac - out->end), mac) < 0 || macError) {
 			ssl->err = SSL_ALERT_BAD_RECORD_MAC;
 			matrixStrDebugMsg("Couldn't verify MAC or pad of record data\n",
 				NULL);
@@ -270,7 +270,7 @@ decodeMore:
 	Check now for maximum plaintext length of 16kb.  No appropriate
 	SSL alert for this
 */
-	if ((int)(pend - p) > SSL_MAX_PLAINTEXT_LEN) {
+	if ((int32)(pend - p) > SSL_MAX_PLAINTEXT_LEN) {
 		ssl->err = SSL_ALERT_BAD_RECORD_MAC;
 		matrixStrDebugMsg("Record overflow\n", NULL);
 		goto encodeResponse;
@@ -350,7 +350,7 @@ decodeMore:
 		or an error alert, send it).  If the message was parsed, but no
 		response is needed, loop up and try to parse another message
 */
-		rc = parseSSLHandshake(ssl, (char*)p, (int)(pend - p));
+		rc = parseSSLHandshake(ssl, (char*)p, (int32)(pend - p));
 		switch (rc) {
 		case SSL_SUCCESS:
 			in->start = c;
@@ -367,7 +367,7 @@ decodeMore:
 /*
 		Data is in the out buffer, let user handle it
 		Don't allow application data until handshake is complete, and we are
-		secure. It is ok to let application data through on the client
+		secure.  It is ok to let application data through on the client
 		if we are in the SERVER_HELLO state because this could mean that
 		the client has sent a CLIENT_HELLO message for a rehandshake
 		and is awaiting reply.
@@ -427,7 +427,7 @@ encodeResponse:
 	the response into outbuf.  rec.len could be invalid, clear the minimum 
 	of rec.len and remaining outbuf size
 */
-	rc = min (ssl->rec.len, (int)((out->buf + out->size) - out->end));
+	rc = min (ssl->rec.len, (int32)((out->buf + out->size) - out->end));
 	if (rc > 0) {
 		memset(out->end, 0x0, rc);
 	}
@@ -471,29 +471,26 @@ encodeResponse:
 		SSL_PROCESS_DATA
 		SSL_ERROR - see ssl->err for details
 */
-static int parseSSLHandshake(ssl_t *ssl, char *inbuf, int len)
+static int32 parseSSLHandshake(ssl_t *ssl, char *inbuf, int32 len)
 {
 	unsigned char	*c;
 	unsigned char	*end;
 	unsigned char	hsType;
-	int				hsLen, rc; 
-	unsigned int	cipher = 0;
-	unsigned char	*hsMsgHash = NULL;
+	int32			hsLen, rc, parseLen = 0; 
+	uint32			cipher = 0;
+	unsigned char	hsMsgHash[SSL_MD5_HASH_SIZE + SSL_SHA1_HASH_SIZE];
 
 #ifdef USE_SERVER_SIDE_SSL
 	unsigned char	*p;
-	int				suiteLen, challengeLen, pubKeyLen, extLen;
+	int32				suiteLen, challengeLen, pubKeyLen, extLen;
 #endif /* USE_SERVER_SIDE_SSL */
 
 #ifdef USE_CLIENT_SIDE_SSL
-	int				sessionIdLen;
-#endif /* USE_CLIENT_SIDE_SSL */
-
-
-#ifdef USE_CLIENT_SIDE_SSL
+	int32			sessionIdLen, certMatch, certTypeLen;
 	sslRsaCert_t	*cert, *currentCert, *subjectCert;
-	int				i, certLen, certChainLen;
+	int32			i, certLen, certChainLen;
 #endif /* USE_CLIENT_SIDE_SSL */
+
 
 	rc = SSL_SUCCESS;
 	c = (unsigned char*)inbuf;
@@ -512,6 +509,21 @@ parseHandshake:
 */
 	if (hsType != ssl->hsState && 
 			(hsType != SSL_HS_CLIENT_HELLO || ssl->hsState != SSL_HS_DONE)) {
+
+/*
+		A mismatch is also possible in the client authentication case.
+		The optional CERTIFICATE_REQUEST may be appearing instead of 
+		SERVER_HELLO_DONE.
+*/
+		if ((hsType == SSL_HS_CERTIFICATE_REQUEST) &&
+				(ssl->hsState == SSL_HS_SERVER_HELLO_DONE)) {
+/*
+			This is where the client is first aware of requested client
+			authentication so we set the flag here.
+*/
+			ssl->flags |= SSL_FLAGS_CLIENT_AUTH;
+			ssl->hsState = SSL_HS_CERTIFICATE_REQUEST;
+		} else {
 /*
 			The final possible mismatch allowed is for a HELLO_REQEST message.
 			Indicates a rehandshake initiated from the server.
@@ -527,6 +539,7 @@ parseHandshake:
 					hsType);
 				return SSL_ERROR;
 			}
+		}
 	}
 	if (hsType == SSL_HS_CLIENT_HELLO) { 
 		sslInitHSHash(ssl);
@@ -545,7 +558,6 @@ parseHandshake:
 	before we update the handshake hashes
 */
 	if (ssl->hsState == SSL_HS_FINISHED) {
-		hsMsgHash = psMalloc(SSL_MD5_HASH_SIZE + SSL_SHA1_HASH_SIZE);
 		sslSnapshotHSHash(ssl, hsMsgHash, 
 			(ssl->flags & SSL_FLAGS_SERVER) ? 0 : SSL_FLAGS_SERVER);
 	}
@@ -651,8 +663,12 @@ parseHandshake:
 					The id must be present in the lookup table
 					The requested version must match the original version
 					The cipher suite list must contain the original cipher suite
+
+				Do not allow session resumption if this server is requesting
+				client authentication.
 */
-				if (matrixResumeSession(ssl) >= 0) {
+				if (!(ssl->flags & SSL_FLAGS_CLIENT_AUTH) &&
+						matrixResumeSession(ssl) >= 0) {
 					ssl->flags |= SSL_FLAGS_RESUMED;
 				} else {
 					memset(ssl->sessionId, 0, SSL_MAX_SESSION_ID_SIZE);
@@ -899,14 +915,20 @@ parseHandshake:
 		sslActivatePublicCipher(ssl);
 
 		pubKeyLen = hsLen;
-
-		if (ssl->decryptPriv(ssl->keys->cert.privKey, c, pubKeyLen,
+/*
+		As a server, we may have allocated a pool during the Certificate
+		step of client auth.  If not, allocate the pool here for the
+		RSA operations.
+*/
+		ssl->hsPool = NULL;
+		if (ssl->decryptPriv(ssl->hsPool, ssl->keys->cert.privKey, c, pubKeyLen,
 				ssl->sec.premaster, SSL_HS_PREMASTER_SIZE) != 
 				SSL_HS_PREMASTER_SIZE) {
 			ssl->err = SSL_ALERT_ILLEGAL_PARAMETER;
 			matrixStrDebugMsg("Failed to decrypt premaster\n", NULL);
 			return SSL_ERROR;
 		}
+
 /*
 		The first two bytes of the decrypted message should be the client's 
 		requested version number (which may not be the same as the final 
@@ -955,7 +977,6 @@ parseHandshake:
 		This is the first handshake message that was sent securely.
 */
 		if (!(ssl->flags & SSL_FLAGS_READ_SECURE)) {
-			psFree(hsMsgHash);
 			ssl->err = SSL_ALERT_UNEXPECTED_MESSAGE;
 			matrixStrDebugMsg("Finished before ChangeCipherSpec\n", NULL);
 			return SSL_ERROR;
@@ -978,12 +999,10 @@ parseHandshake:
 			return SSL_ERROR;
 		}
 		if (memcmp(c, hsMsgHash, hsLen) != 0) {
-			psFree(hsMsgHash);
 			ssl->err = SSL_ALERT_ILLEGAL_PARAMETER;
 			matrixStrDebugMsg("Invalid handshake msg hash\n", NULL);
 			return SSL_ERROR;
 		}
-		psFree(hsMsgHash);
 		c += hsLen;
 		ssl->hsState = SSL_HS_DONE;
 /*
@@ -1001,6 +1020,21 @@ parseHandshake:
 				rc = SSL_PROCESS_DATA;
 			}
 		}
+#ifdef USE_CLIENT_SIDE_SSL
+/*
+		Free handshake pool, of which the cert is the primary member.
+		There is also an attempt to free the handshake pool during
+		the sending of the finished message to deal with client
+		and server and differing handshake types.  Both cases are 
+		attempted keep the lifespan of this pool as short as possible.
+		This is the default case for the server side.
+*/
+		if (ssl->sec.cert) {
+			matrixX509FreeCert(ssl->sec.cert);
+			ssl->sec.cert = NULL;
+		}
+#endif /* USE_CLIENT_SIDE */
+		ssl->hsPool = NULL;
 		break;
 
 #ifdef USE_CLIENT_SIDE_SSL
@@ -1138,9 +1172,7 @@ parseHandshake:
 			ssl->hsState = SSL_HS_CERTIFICATE;
 		}
 		break;
-#endif /* USE_CLIENT_SIDE_SSL */
 
-#ifdef USE_CLIENT_SIDE_SSL
 	case SSL_HS_CERTIFICATE: 
 
 		if (end - c < 3) {
@@ -1165,6 +1197,7 @@ parseHandshake:
 			matrixStrDebugMsg("Invalid Certificate message\n", NULL);
 			return SSL_ERROR;
 		}
+		ssl->hsPool = NULL;
 
 		i = 0;
 		while (certChainLen > 0) {
@@ -1180,11 +1213,12 @@ parseHandshake:
 /*
 			Extract the binary cert message into the cert structure
 */
-			if (matrixX509ParseCert(&c, certLen, &cert) < 0) {
+			if ((parseLen = matrixX509ParseCert(ssl->hsPool, c, certLen, &cert)) < 0) {
 				ssl->err = SSL_ALERT_BAD_CERTIFICATE;
 				matrixStrDebugMsg("Can't parse certificate\n", NULL);
 				return SSL_ERROR;
 			}
+			c += parseLen;
 
 			if (i++ == 0) {
 				ssl->sec.cert = cert;
@@ -1200,7 +1234,7 @@ parseHandshake:
 		must be in order so that each subsequent one is the parent of the
 		previous.  Confirm this now.
 */
-		if (matrixX509ValidateChain(ssl->sec.cert, &subjectCert) < 0) {
+		if (matrixX509ValidateChain(ssl->hsPool, ssl->sec.cert, &subjectCert) < 0) {
 			matrixStrDebugMsg("Couldn't validate certificate chain\n", NULL);
 			return SSL_ERROR;	
 		}
@@ -1208,8 +1242,8 @@ parseHandshake:
 		There may not be a caCert set.  The validate implemenation will just
 		take the subject cert and make sure it is a self signed cert.
 */
-		if (matrixX509ValidateCert(subjectCert, 
-			ssl->keys == NULL ? NULL : ssl->keys->caCerts, 0) < 0) {
+		if (matrixX509ValidateCert(ssl->hsPool, subjectCert, 
+			ssl->keys == NULL ? NULL : ssl->keys->caCerts) < 0) {
 			ssl->err = SSL_ALERT_BAD_CERTIFICATE;
 			matrixStrDebugMsg("Error validating certificate\n", NULL);
 			return SSL_ERROR;
@@ -1219,11 +1253,12 @@ parseHandshake:
 				"Warning: Cert did not pass default validation checks\n", NULL);
 		}
 /*
-		The validation was for the upper-most cert in the chain, but the user
-		should verify on the lowest (always the first in the sec.cert struct)
+		Call the user validation function with the entire cert chain.  The user
+		will proabably want to drill down to the last cert to make sure it
+		has been properly validated by a CA on this side.
 */
-		if (matrixX509UserValidator(ssl->sec.cert, ssl->sec.validateCert,
-				ssl->sec.validateCertArg) < 0) {
+		if (matrixX509UserValidator(ssl->hsPool, ssl->sec.cert, 
+				ssl->sec.validateCert, ssl->sec.validateCertArg) < 0) {
 			ssl->err = SSL_ALERT_BAD_CERTIFICATE;
 			return SSL_ERROR;
 		}
@@ -1248,11 +1283,63 @@ parseHandshake:
 		ssl->hsState = SSL_HS_FINISHED;
 		rc = SSL_PROCESS_DATA;
 		break;
+
+	case SSL_HS_CERTIFICATE_REQUEST: 
+		if (hsLen < 4) {
+			ssl->err = SSL_ALERT_ILLEGAL_PARAMETER;
+			matrixStrDebugMsg("Invalid Certificate Request message\n", NULL);
+			return SSL_ERROR;
+		}
+/*
+		We only have RSA_SIGN types.  Make sure server can accept them
+*/
+		certMatch = 0;
+		certTypeLen = *c++;
+		if (end - c < certTypeLen) {
+			ssl->err = SSL_ALERT_ILLEGAL_PARAMETER;
+			matrixStrDebugMsg("Invalid Certificate Request message\n", NULL);
+			return SSL_ERROR;
+		}
+		while (certTypeLen-- > 0) {
+			if (*c++ == RSA_SIGN) {
+				certMatch = 1;
+			}
+		}
+		if (certMatch == 0) {
+			ssl->err = SSL_ALERT_UNSUPPORTED_CERTIFICATE;
+			matrixStrDebugMsg("Can only support RSA_SIGN cert authentication\n",
+				NULL);
+			return SSL_ERROR;
+		}
+		certChainLen = *c << 8; c++;
+		certChainLen |= *c; c++;
+        if (end - c < certChainLen) {
+			ssl->err = SSL_ALERT_ILLEGAL_PARAMETER;
+			matrixStrDebugMsg("Invalid Certificate Request message\n", NULL);
+			return SSL_ERROR;
+		}
+/*
+		Check the passed in DNs against our cert issuer to see if they match.
+		Only supporting a single cert on the client side.
+*/
+		ssl->sec.certMatch = 0;
+		while (certChainLen > 0) {
+			certLen = *c << 8; c++;
+			certLen |= *c; c++;
+			if (end - c < certLen) {
+				ssl->err = SSL_ALERT_ILLEGAL_PARAMETER;
+				matrixStrDebugMsg("Invalid CertificateRequest message\n", NULL);
+				return SSL_ERROR;
+			}
+			c += certLen;
+			certChainLen -= (2 + certLen);
+		}
+		ssl->hsState = SSL_HS_SERVER_HELLO_DONE;
+		break;
 #endif /* USE_CLIENT_SIDE_SSL */
 
 
 	case SSL_HS_SERVER_KEY_EXCHANGE: 
-		/* FUTURE - implement for Diffie or Ephemeral RSA */
 		ssl->err = SSL_ALERT_UNEXPECTED_MESSAGE;
 		return SSL_ERROR;
 	default:
@@ -1270,5 +1357,3 @@ parseHandshake:
 }
 
 /******************************************************************************/
-
-

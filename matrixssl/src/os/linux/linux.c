@@ -1,13 +1,13 @@
 /*
  *	linux.c
- *	Release $Name: MATRIXSSL_1_2_2_OPEN $
+ *	Release $Name: MATRIXSSL_1_2_4_OPEN $
  *
  *	Linux compatibility layer
  *	Other UNIX like operating systems should also be able to use this
  *	implementation without change.
  */
 /*
- *	Copyright (c) PeerSec Networks, 2002-2004. All Rights Reserved.
+ *	Copyright (c) PeerSec Networks, 2002-2005. All Rights Reserved.
  *	The latest version of this code is available at http://www.matrixssl.org
  *
  *	This software is open source; you can redistribute it and/or modify
@@ -37,14 +37,21 @@
 #include <sys/times.h>
 #include <time.h>
 
-#include "../../matrixInternal.h"
+#include "../osLayer.h"
 
-#ifdef __i386__
-#define rdtscll(val) __asm__ __volatile__("rdtsc" : "=A" (val))
+#if defined(__i386__) || defined(RDTSC)
+#include <asm/timex.h>
+/*
+	As defined in asm/timex.h for x386:
+*/
+#ifndef rdtscll
+	#define rdtscll(val) __asm__ __volatile__("rdtsc" : "=A" (val))
+#endif
+
 static sslTime_t	hiresStart; 	/* zero-time */
 static sslTime_t	hiresFreq; 		/* tics per second */
 #else /* __i386__ */
-static unsigned	int prevTicks; 		/* Check wrap */
+static unsigned	int32 prevTicks; 		/* Check wrap */
 static sslTime_t	elapsedTime; 	/* Last elapsed time */
 #endif
 
@@ -56,16 +63,16 @@ static pthread_mutexattr_t	attr;
 /* max sure we don't retry reads forever */
 #define	MAX_RAND_READS		1024
 
-static 	int	urandfd = -1;
-static 	int	randfd	= -1;
+static 	int32	urandfd = -1;
+static 	int32	randfd	= -1;
 
-int sslOpenOsdep()
+int32 sslOpenOsdep()
 {
 	FILE		*cpuInfo;
 	double		mhz;
 	char		line[80] = "";
 	char		*tmpstr;
-	int 		c;
+	int32 		c;
 /*
 	Open /dev/random access non-blocking.
 */
@@ -79,7 +86,7 @@ int sslOpenOsdep()
 /*
 	Initialize times
 */
-#ifdef __i386__
+#if defined(__i386__) || defined(RDTSC)
 	if ((cpuInfo = fopen ("/proc/cpuinfo","r")) == NULL) {
 		matrixStrDebugMsg("Error opening /proc/cpuinfo\n", NULL);
 		return -2;
@@ -97,7 +104,7 @@ int sslOpenOsdep()
 		c = strcspn(tmpstr, " \t\n\r");
 		tmpstr[c] = '\0';
 		mhz = 1000000 * atof(tmpstr);
-		hiresFreq = (int)mhz;
+		hiresFreq = (sslTime_t)mhz;
 		fclose (cpuInfo);	
 	} else {
 		fclose (cpuInfo);
@@ -118,11 +125,10 @@ int sslOpenOsdep()
 #endif /* !OSX */
 	pthread_mutexattr_init(&attr);
 #endif /* USE_MULTITHREADING */
-	psOpenMalloc(MAX_MEMORY_USAGE);
-	return 0;
+	return psOpenMalloc(MAX_MEMORY_USAGE);
 }
 
-int sslCloseOsdep()
+int32 sslCloseOsdep()
 {
 	psCloseMalloc();
 #ifdef USE_MULTITHREADING
@@ -138,9 +144,9 @@ int sslCloseOsdep()
 	block.  Also, handle file closure case and re-open.
 */
 
-int sslGetEntropy(unsigned char *bytes, int size)
+int32 sslGetEntropy(unsigned char *bytes, int32 size)
 {
-	int				rc, sanity, retry;
+	int32				rc, sanity, retry;
 	unsigned char 	*where = bytes;
 
 	sanity = retry = rc = 0;
@@ -209,7 +215,7 @@ void psBreak()
 
 #ifdef USE_MULTITHREADING
 
-int sslCreateMutex(sslMutex_t *mutex)
+int32 sslCreateMutex(sslMutex_t *mutex)
 {
 
 	if (pthread_mutex_init(mutex, &attr) != 0) {
@@ -218,7 +224,7 @@ int sslCreateMutex(sslMutex_t *mutex)
 	return 0;
 }
 
-int sslLockMutex(sslMutex_t *mutex)
+int32 sslLockMutex(sslMutex_t *mutex)
 {
 	if (pthread_mutex_lock(mutex) != 0) {
 		return -1;
@@ -226,7 +232,7 @@ int sslLockMutex(sslMutex_t *mutex)
 	return 0;
 }
 
-int sslUnlockMutex(sslMutex_t *mutex)
+int32 sslUnlockMutex(sslMutex_t *mutex)
 {
 	if (pthread_mutex_unlock(mutex) != 0) {
 		return -1;
@@ -244,34 +250,45 @@ void sslDestroyMutex(sslMutex_t *mutex)
 /*
 	Use a platform specific high resolution timer
 */
-#ifdef __i386__
+#if defined(__i386__) || defined(RDTSC)
 
-int sslInitMsecs(sslTime_t *t)
+int32 sslInitMsecs(sslTime_t *t)
 {
 	unsigned long long	diff;
-	int					d;
-	
+	int32					d;
+
 	rdtscll(*t);
 	diff = *t - hiresStart;
-	d = (int)((diff * 1000) / hiresFreq);
+	d = (int32)((diff * 1000) / hiresFreq);
 	return d;
 }
 
 /*
 	Return the delta in seconds between two time values
 */
-int sslDiffSecs(sslTime_t then, sslTime_t now)
+long sslDiffMsecs(sslTime_t then, sslTime_t now)
 {
 	unsigned long long	diff;
 
 	diff = now - then;
-	return (int)(diff / hiresFreq);
+	return (long)((diff * 1000) / hiresFreq);
+}
+
+/*
+	Return the delta in seconds between two time values
+*/
+int32 sslDiffSecs(sslTime_t then, sslTime_t now)
+{
+	unsigned long long	diff;
+
+	diff = now - then;
+	return (int32)(diff / hiresFreq);
 }
 
 /*
 	Time comparison.  1 if 'a' is less than or equal.  0 if 'a' is greater
 */
-int	sslCompareTime(sslTime_t a, sslTime_t b)
+int32	sslCompareTime(sslTime_t a, sslTime_t b)
 {
 	if (a <= b) {
 		return 1;
@@ -281,10 +298,10 @@ int	sslCompareTime(sslTime_t a, sslTime_t b)
 
 #else /* __i386__ */
 
-int sslInitMsecs(sslTime_t *timePtr)
+int32 sslInitMsecs(sslTime_t *timePtr)
 {
 	struct tms		tbuff;
-	unsigned int	t, deltat, deltaticks;
+	uint32	t, deltat, deltaticks;
                                                                                 
 /*
  *	times() returns the number of clock ticks since the system
@@ -322,15 +339,23 @@ int sslInitMsecs(sslTime_t *timePtr)
 /*
 	Return the delta in seconds between two time values
 */
-int sslDiffSecs(sslTime_t then, sslTime_t now)
+long sslDiffMsecs(sslTime_t then, sslTime_t now)
 {
-	return (int)(now.sec - then.sec);
+	return (long)((now.sec - then.sec) * 1000);
+}
+
+/*
+	Return the delta in seconds between two time values
+*/
+int32 sslDiffSecs(sslTime_t then, sslTime_t now)
+{
+	return (int32)(now.sec - then.sec);
 }
 
 /*
 	Time comparison.  1 if 'a' is less than or equal.  0 if 'a' is greater
 */
-int	sslCompareTime(sslTime_t a, sslTime_t b)
+int32	sslCompareTime(sslTime_t a, sslTime_t b)
 {
 	if (a.sec < b.sec) {
 		return 1;

@@ -1,11 +1,11 @@
 /*
  *	socketLayer.h
- *	Release $Name: MATRIXSSL_1_2_2_OPEN $
+ *	Release $Name: MATRIXSSL_1_2_4_OPEN $
  *
  *	Sample SSL socket layer header for MatrixSSL
  */
 /*
- *	Copyright (c) PeerSec Networks, 2002-2004. All Rights Reserved.
+ *	Copyright (c) PeerSec Networks, 2002-2005. All Rights Reserved.
  *	The latest version of this code is available at http://www.matrixssl.org
  *
  *	This software is open source; you can redistribute it and/or modify
@@ -141,6 +141,9 @@ extern SOCKET	socketListen(short port, int *err);
 extern SOCKET	socketAccept(SOCKET listenfd, int *err);
 extern SOCKET	socketConnect(char *ip, short port, int *err);
 extern void		socketShutdown(SOCKET sock);
+
+extern int psSocketRead(SOCKET sock, sslBuf_t **out, int *status);
+extern int psSocketWrite(SOCKET sock, sslBuf_t *out);
 
 extern void setSocketBlock(SOCKET sock);
 extern void setSocketNonblock(SOCKET sock);

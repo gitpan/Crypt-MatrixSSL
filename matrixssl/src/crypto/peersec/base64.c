@@ -1,11 +1,11 @@
 /*
  *	base64.c
- *	Release $Name: MATRIXSSL_1_2_2_OPEN $
+ *	Release $Name: MATRIXSSL_1_2_4_OPEN $
  *
  *	Base64 operations
  */
 /*
- *	Copyright (c) PeerSec Networks, 2002-2004. All Rights Reserved.
+ *	Copyright (c) PeerSec Networks, 2002-2005. All Rights Reserved.
  *	The latest version of this code is available at http://www.matrixssl.org
  *
  *	This software is open source; you can redistribute it and/or modify
@@ -55,12 +55,12 @@ static const unsigned char map[256] = {
 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
 255, 255, 255, 255 };
 
-int ps_base64_decode(const unsigned char *in,  unsigned int len, 
-					unsigned char *out, unsigned int *outlen)
+int32 ps_base64_decode(const unsigned char *in,  uint32 len, 
+					unsigned char *out, uint32 *outlen)
 {
 	unsigned long	t, x, y, z;
 	unsigned char	c;
-	int				g;
+	int32				g;
 
 	if (in == NULL || out == NULL || outlen == NULL) {
 		return -1;

@@ -1,13 +1,13 @@
 /*
  *	cipherSuite.c
- *	Release $Name: MATRIXSSL_1_2_2_OPEN $
+ *	Release $Name: MATRIXSSL_1_2_4_OPEN $
  *
  *	Wrappers for the various cipher suites.
  *	Contributors should add additional cipher suites here.
  *	Enable specific suites at compile time in matrixConfig.h
  */
 /*
- *	Copyright (c) PeerSec Networks, 2002-2004. All Rights Reserved.
+ *	Copyright (c) PeerSec Networks, 2002-2005. All Rights Reserved.
  *	The latest version of this code is available at http://www.matrixssl.org
  *
  *	This software is open source; you can redistribute it and/or modify
@@ -40,45 +40,47 @@
 	before ssl_t is defined.
 */
 #ifdef USE_SHA1_MAC
-static int sha1GenerateMac(void *ssl, unsigned char type, unsigned char *data, 
-							int len, unsigned char *mac);
-static int sha1VerifyMac(void *ssl, unsigned char type, unsigned char *data, 
-							int len, unsigned char *mac);
+static int32 sha1GenerateMac(void *ssl, unsigned char type, unsigned char *data, 
+							int32 len, unsigned char *mac);
+static int32 sha1VerifyMac(void *ssl, unsigned char type, unsigned char *data, 
+							int32 len, unsigned char *mac);
 #endif
 
 #ifdef USE_MD5_MAC
-static int md5GenerateMac(void *ssl, unsigned char type, unsigned char *data, 
-							int len, unsigned char *mac);
-static int md5VerifyMac(void *ssl, unsigned char type, unsigned char *data, 
-							int len, unsigned char *mac);
+static int32 md5GenerateMac(void *ssl, unsigned char type, unsigned char *data, 
+							int32 len, unsigned char *mac);
+static int32 md5VerifyMac(void *ssl, unsigned char type, unsigned char *data, 
+							int32 len, unsigned char *mac);
 #endif
 
 #ifdef USE_SSL_RSA_WITH_RC4_128_MD5
-static int matrixCipher4Init(sslSec_t *sec, int type);
+static int32 matrixCipher4Init(sslSec_t *sec, int32 type);
 #endif /* USE_SSL_RSA_WITH_RC4_128_MD5 */
 
 #ifdef USE_SSL_RSA_WITH_RC4_128_SHA
-static int matrixCipher5Init(sslSec_t *sec, int type);
+static int32 matrixCipher5Init(sslSec_t *sec, int32 type);
 #endif /* USE_SSL_RSA_WITH_RC4_128_SHA */
 
 #ifdef USE_SSL_RSA_WITH_3DES_EDE_CBC_SHA
-static int matrixCipherAInit(sslSec_t *sec, int type);
+static int32 matrixCipherAInit(sslSec_t *sec, int32 type);
 #endif /* USE_SSL_RSA_WITH_3DES_EDE_CBC_SHA */
 
 
-static int nullInit(sslSec_t *sec, int type);
-static int nullEncrypt(sslCipherContext_t *ctx, unsigned char *in,
-					   unsigned char *out, int len);
-static int nullDecrypt(sslCipherContext_t *ctx, unsigned char *in,
-					   unsigned char *out, int len);
-static int nullEncryptPub(sslRsaKey_t *key, unsigned char *in, int inlen,
-						  unsigned char *out, int outlen);
-static int nullDecryptPriv(sslRsaKey_t *key, unsigned char *in, int inlen,
-						   unsigned char *out, int outlen);
-static int nullGenerateMac(void *ssl, unsigned char type, unsigned char *data, 
-						   int len, unsigned char *mac);
-static int nullVerifyMac(void *ssl, unsigned char type, unsigned char *data, 
-						 int len, unsigned char *mac);
+static int32 nullInit(sslSec_t *sec, int32 type);
+static int32 nullEncrypt(sslCipherContext_t *ctx, unsigned char *in,
+					   unsigned char *out, int32 len);
+static int32 nullDecrypt(sslCipherContext_t *ctx, unsigned char *in,
+					   unsigned char *out, int32 len);
+static int32 nullEncryptPub(psPool_t *pool, sslRsaKey_t *key, 
+						  unsigned char *in, int32 inlen,
+						  unsigned char *out, int32 outlen);
+static int32 nullDecryptPriv(psPool_t *pool, sslRsaKey_t *key, 
+						   unsigned char *in, int32 inlen,
+						   unsigned char *out, int32 outlen);
+static int32 nullGenerateMac(void *ssl, unsigned char type, unsigned char *data, 
+						   int32 len, unsigned char *mac);
+static int32 nullVerifyMac(void *ssl, unsigned char type, unsigned char *data, 
+						 int32 len, unsigned char *mac);
 
 /******************************************************************************/
 
@@ -185,13 +187,13 @@ static sslCipherSpec_t	supportedCiphers[] = {
 	if found.  This is used when negotiating security, to find out what suites
 	we support.
 */
-sslCipherSpec_t *sslGetCipherSpec(int id)
+sslCipherSpec_t *sslGetCipherSpec(int32 id)
 {
-	int		i;
+	int32	i;
 
 	i = 0;
 	do {
-		if ((int)supportedCiphers[i].id == id) {
+		if ((int32)supportedCiphers[i].id == id) {
 			return &supportedCiphers[i];
 		}
 	} while (supportedCiphers[i++].id != SSL_NULL_WITH_NULL_NULL) ;
@@ -205,7 +207,7 @@ sslCipherSpec_t *sslGetCipherSpec(int id)
 	First 2 bytes are the number of cipher suite bytes, the remaining bytes are
 	the cipher suites, as two byte, network byte order values.
 */
-int sslGetCipherSpecList(unsigned char *c, int len)
+int32 sslGetCipherSpecList(unsigned char *c, int32 len)
 {
 	unsigned char	*end, *p;
 	unsigned short	i;
@@ -232,28 +234,29 @@ int sslGetCipherSpecList(unsigned char *c, int len)
 /*
 	Return the length of the cipher spec list, including initial length bytes
 */
-int sslGetCipherSpecListLen()
+int32 sslGetCipherSpecListLen()
 {
-	int		i;
+	int32	i;
 
 	for (i = 0; supportedCiphers[i].id != SSL_NULL_WITH_NULL_NULL; i++) {
 	}
 	return (i * 2) + 2;
 }
 
+
 /******************************************************************************/
 /*
 */
 #ifdef USE_SHA1_MAC
-static int sha1GenerateMac(void *sslv, unsigned char type, unsigned char *data, 
-							int len, unsigned char *mac)
+static int32 sha1GenerateMac(void *sslv, unsigned char type, unsigned char *data, 
+							int32 len, unsigned char *mac)
 {
 	ssl_t	*ssl = (ssl_t*)sslv;
 		return ssl3HMACSha1(ssl->sec.writeMAC, ssl->sec.seq, type, data, len, mac);
 }
 
-static int sha1VerifyMac(void *sslv, unsigned char type, unsigned char *data,
-					int len, unsigned char *mac)
+static int32 sha1VerifyMac(void *sslv, unsigned char type, unsigned char *data,
+					int32 len, unsigned char *mac)
 {
 	ssl_t			*ssl = (ssl_t*)sslv;
 	unsigned char	buf[SSL_SHA1_HASH_SIZE];
@@ -270,15 +273,15 @@ static int sha1VerifyMac(void *sslv, unsigned char type, unsigned char *data,
 /*
 */
 #ifdef USE_MD5_MAC
-static int md5GenerateMac(void *sslv, unsigned char type, unsigned char *data,
-						  int len, unsigned char *mac)
+static int32 md5GenerateMac(void *sslv, unsigned char type, unsigned char *data,
+						  int32 len, unsigned char *mac)
 {
 	ssl_t	*ssl = (ssl_t*)sslv;
 		return ssl3HMACMd5(ssl->sec.writeMAC, ssl->sec.seq, type, data, len, mac);
 }
 
-static int md5VerifyMac(void *sslv, unsigned char type, unsigned char *data,
-						int len, unsigned char *mac)
+static int32 md5VerifyMac(void *sslv, unsigned char type, unsigned char *data,
+						int32 len, unsigned char *mac)
 {
 	ssl_t			*ssl = (ssl_t*)sslv;
 	unsigned char	buf[SSL_MD5_HASH_SIZE];
@@ -297,7 +300,7 @@ static int md5VerifyMac(void *sslv, unsigned char type, unsigned char *data,
 	SSL_RSA_WITH_RC4_128_SHA cipher init
 */
 #ifdef USE_SSL_RSA_WITH_RC4_128_MD5
-static int matrixCipher4Init(sslSec_t *sec, int type)
+static int32 matrixCipher4Init(sslSec_t *sec, int32 type)
 {
 	if (type == INIT_ENCRYPT_CIPHER) {
 		matrixArc4Init(&(sec->encryptCtx), sec->writeKey, 16);
@@ -314,7 +317,7 @@ static int matrixCipher4Init(sslSec_t *sec, int type)
 	SSL_RSA_WITH_RC4_128_SHA cipher init
 */
 #ifdef USE_SSL_RSA_WITH_RC4_128_SHA
-static int matrixCipher5Init(sslSec_t *sec, int type)
+static int32 matrixCipher5Init(sslSec_t *sec, int32 type)
 {
 	if (type == INIT_ENCRYPT_CIPHER) {
 		matrixArc4Init(&(sec->encryptCtx), sec->writeKey, 16);
@@ -331,7 +334,7 @@ static int matrixCipher5Init(sslSec_t *sec, int type)
 	SSL_RSA_WITH_3DES_EDE_CBC_SHA cipher init
 */
 #ifdef USE_SSL_RSA_WITH_3DES_EDE_CBC_SHA
-static int matrixCipherAInit(sslSec_t *sec, int type)
+static int32 matrixCipherAInit(sslSec_t *sec, int32 type)
 {
 	if (type == INIT_ENCRYPT_CIPHER) {
 		if (matrix3desInit(&(sec->encryptCtx), sec->writeIV, sec->writeKey, 
@@ -355,13 +358,13 @@ static int matrixCipherAInit(sslSec_t *sec, int type)
 	Used in handshaking before SSL_RECORD_TYPE_CHANGE_CIPHER_SPEC message
 	FUTURE - remove the memcpy to support in-situ decryption
 */
-static int nullInit(sslSec_t *sec, int type)
+static int32 nullInit(sslSec_t *sec, int32 type)
 {
 	return 0;
 }
 
-static int nullEncrypt(sslCipherContext_t *ctx, unsigned char *in,
-					   unsigned char *out, int len)
+static int32 nullEncrypt(sslCipherContext_t *ctx, unsigned char *in,
+					   unsigned char *out, int32 len)
 {
 	if (out != in) {
 		memcpy(out, in, len);
@@ -369,8 +372,8 @@ static int nullEncrypt(sslCipherContext_t *ctx, unsigned char *in,
 	return len;
 }
 
-static int nullDecrypt(sslCipherContext_t *ctx, unsigned char *in,
-					   unsigned char *out, int len)
+static int32 nullDecrypt(sslCipherContext_t *ctx, unsigned char *in,
+					   unsigned char *out, int32 len)
 {
 	if (out != in) {
 		memcpy(out, in, len);
@@ -378,8 +381,12 @@ static int nullDecrypt(sslCipherContext_t *ctx, unsigned char *in,
 	return len;
 }
 
-static int nullEncryptPub(sslRsaKey_t *key, unsigned char *in, int inlen,
-						  unsigned char *out, int outlen)
+/*
+	FUTURE - remove both apis below
+*/
+static int32 nullEncryptPub(psPool_t *pool, sslRsaKey_t *key, 
+						  unsigned char *in, int32 inlen,
+						  unsigned char *out, int32 outlen)
 {
 	if (inlen <= outlen) {
 		matrixStrDebugMsg("Error: output buffer too small for NULL encrypt\n",
@@ -390,8 +397,8 @@ static int nullEncryptPub(sslRsaKey_t *key, unsigned char *in, int inlen,
 	return inlen;
 }
 
-static int nullDecryptPriv(sslRsaKey_t *key, unsigned char *in, int inlen,
-						   unsigned char *out, int outlen)
+static int32 nullDecryptPriv(psPool_t *pool, sslRsaKey_t *key, unsigned char *in, int32 inlen,
+						   unsigned char *out, int32 outlen)
 {
 	if (inlen <= outlen) {
 		matrixStrDebugMsg("Error: output buffer too small for NULL decrypt\n",
@@ -402,14 +409,14 @@ static int nullDecryptPriv(sslRsaKey_t *key, unsigned char *in, int inlen,
 	return inlen;
 }
 
-static int nullGenerateMac(void *ssl, unsigned char type, unsigned char *data, 
-						   int len, unsigned char *mac)
+static int32 nullGenerateMac(void *ssl, unsigned char type, unsigned char *data, 
+						   int32 len, unsigned char *mac)
 {
 	return 0;
 }
 
-static int nullVerifyMac(void *ssl, unsigned char type, unsigned char *data, 
-						 int len, unsigned char *mac)
+static int32 nullVerifyMac(void *ssl, unsigned char type, unsigned char *data, 
+						 int32 len, unsigned char *mac)
 {
 	return 0;
 }

@@ -1,13 +1,13 @@
 /*
  *	osLayer.h
- *	Release $Name: MATRIXSSL_1_2_2_OPEN $
+ *	Release $Name: MATRIXSSL_1_2_4_OPEN $
  *	
  *	Layered header for OS specific functions
  *	Contributors adding new OS support must implement all functions 
  *	externed below.
  */
 /*
- *	Copyright (c) PeerSec Networks, 2002-2004. All Rights Reserved.
+ *	Copyright (c) PeerSec Networks, 2002-2005. All Rights Reserved.
  *	The latest version of this code is available at http://www.matrixssl.org
  *
  *	This software is open source; you can redistribute it and/or modify
@@ -34,6 +34,9 @@
 #ifndef _h_OS_LAYER
 #define _h_OS_LAYER
 
+#include <stdio.h>
+#include <stdlib.h>
+
 #ifndef WINCE
 #include <time.h>
 #endif
@@ -42,12 +45,33 @@
 extern "C" {
 #endif
 
+/******************************************************************************/
+/*
+	Platform integer sizes.  Must match values in matrixSsl.h
+*/
+#ifndef MATRIX_INT32
+#define MATRIX_INT32
+typedef int int32;
+#endif
+
+#ifndef MATRIX_UINT32
+#define MATRIX_UINT32
+typedef unsigned int uint32;
+#endif
+
+#ifndef min
+#define min(a,b)	(((a) < (b)) ? (a) : (b))
+#endif
+
+#include "../matrixConfig.h"
+#include "psMalloc.h"
+
 /*
 	Functions defined at OS level
 */
-extern int	sslOpenOsdep();
-extern int	sslCloseOsdep();
-extern int	sslGetEntropy(unsigned char *bytes, int size);
+extern int32	sslOpenOsdep();
+extern int32	sslCloseOsdep();
+extern int32	sslGetEntropy(unsigned char *bytes, int32 size);
 
 /*
 	Defines to make library multithreading safe
@@ -65,24 +89,25 @@ typedef CRITICAL_SECTION sslMutex_t;
 
 #elif LINUX
 #include <pthread.h>
+#include <string.h>
 
 typedef pthread_mutex_t sslMutex_t;
-extern int	sslCreateMutex(sslMutex_t *mutex);
-extern int	sslLockMutex(sslMutex_t *mutex);
-extern int	sslUnlockMutex(sslMutex_t *mutex);
+extern int32	sslCreateMutex(sslMutex_t *mutex);
+extern int32	sslLockMutex(sslMutex_t *mutex);
+extern int32	sslUnlockMutex(sslMutex_t *mutex);
 extern void	sslDestroyMutex(sslMutex_t *mutex);
 #elif VXWORKS
 #include "semLib.h"
 
 typedef SEM_ID		sslMutex_t; 
-extern int	sslCreateMutex(sslMutex_t *mutex);
-extern int	sslLockMutex(sslMutex_t *mutex);
-extern int	sslUnlockMutex(sslMutex_t *mutex);
+extern int32	sslCreateMutex(sslMutex_t *mutex);
+extern int32	sslLockMutex(sslMutex_t *mutex);
+extern int32	sslUnlockMutex(sslMutex_t *mutex);
 extern void	sslDestroyMutex(sslMutex_t *mutex);
 #endif /* WIN32 || CE */
 
 #else /* USE_MULTITHREADING */
-typedef int	sslMutex_t;
+typedef int32	sslMutex_t;
 #define sslCreateMutex(M)
 #define sslLockMutex(M)
 #define sslUnlockMutex(M)
@@ -94,7 +119,7 @@ typedef int	sslMutex_t;
 	Make sslTime_t an opaque time value.
 	FUTURE - use high res time instead of time_t
 */
-#if WIN32
+#if defined(WIN32)
 #include <windows.h>
 typedef LARGE_INTEGER sslTime_t;
 #elif VXWORKS
@@ -102,12 +127,11 @@ typedef struct {
 		long sec;
 		long usec;
 	} sslTime_t;
-#elif __i386__
+#elif (defined(__i386__) || defined(RDTSC))
 typedef unsigned long long LARGE_INTEGER;
 typedef LARGE_INTEGER sslTime_t;
 #elif WINCE
 #include <windows.h>
-#include <stdlib.h>
 
 typedef LARGE_INTEGER sslTime_t;
 #else
@@ -122,9 +146,8 @@ typedef struct {
 	We define our own stat for CE.
 */
 #if WINCE
-#include <stdlib.h>
 
-extern int stat(char *filename, struct stat *sbuf);
+extern int32 stat(char *filename, struct stat *sbuf);
 
 struct stat {
 	unsigned long st_size;	/* file size in bytes				*/
@@ -141,9 +164,37 @@ extern time_t time();
 
 #endif /* WINCE */
 
-extern int		sslInitMsecs(sslTime_t *t);
-extern int		sslCompareTime(sslTime_t a, sslTime_t b);
-extern int		sslDiffSecs(sslTime_t then, sslTime_t now);
+extern int32		sslInitMsecs(sslTime_t *t);
+extern int32		sslCompareTime(sslTime_t a, sslTime_t b);
+extern int32		sslDiffSecs(sslTime_t then, sslTime_t now);
+extern long		sslDiffMsecs(sslTime_t then, sslTime_t now);
+
+/******************************************************************************/
+/*
+	Debugging functionality.  
+	
+	If DEBUG is defined matrixStrDebugMsg and matrixIntDebugMsg messages are
+	output to stdout, sslAsserts go to stderror and call psBreak.
+
+	In non-DEBUG builds matrixStrDebugMsg and matrixIntDebugMsg are 
+	compiled out.  sslAsserts still go to stderr, but psBreak is not called.
+
+*/
+
+#if DEBUG
+extern void	psBreak();
+extern void matrixStrDebugMsg(char *message, char *arg);
+extern void matrixIntDebugMsg(char *message, int32 arg);
+extern void matrixPtrDebugMsg(char *message, void *arg);
+#define sslAssert(C)  if (C) ; else \
+	{fprintf(stderr, "%s:%d sslAssert(%s)\n",__FILE__, __LINE__, #C); psBreak(); }
+#else
+#define matrixStrDebugMsg(x, y)
+#define matrixIntDebugMsg(x, y)
+#define matrixPtrDebugMsg(x, y)
+#define sslAssert(C)  if (C) ; else \
+	{fprintf(stderr, "%s:%d sslAssert(%s)\n",__FILE__, __LINE__, #C); }
+#endif /* DEBUG */
 
 #ifdef __cplusplus
 }

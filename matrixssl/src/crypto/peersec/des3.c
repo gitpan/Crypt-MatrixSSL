@@ -1,11 +1,11 @@
 /*
  *	des3.c
- *	Release $Name: MATRIXSSL_1_2_2_OPEN $
+ *	Release $Name: MATRIXSSL_1_2_4_OPEN $
  *
  *	3DES block cipher implementation for low memory usage
  */
 /*
- *	Copyright (c) PeerSec Networks, 2002-2004. All Rights Reserved.
+ *	Copyright (c) PeerSec Networks, 2002-2005. All Rights Reserved.
  *	The latest version of this code is available at http://www.matrixssl.org
  *
  *	This software is open source; you can redistribute it and/or modify
@@ -72,7 +72,7 @@ static const unsigned char totrot[16] = {
     23, 25, 27, 28
 };
 
-static const ulong32 SP1[64] =
+static const ulong32 SP1[] =
 {
 	0x01010400UL, 0x00000000UL, 0x00010000UL, 0x01010404UL,
 	0x01010004UL, 0x00010404UL, 0x00000004UL, 0x00010000UL,
@@ -92,7 +92,7 @@ static const ulong32 SP1[64] =
 	0x00010004UL, 0x00010400UL, 0x00000000UL, 0x01010004UL
 };
 
-static const ulong32 SP2[64] =
+static const ulong32 SP2[] =
 {
 	0x80108020UL, 0x80008000UL, 0x00008000UL, 0x00108020UL,
 	0x00100000UL, 0x00000020UL, 0x80100020UL, 0x80008020UL,
@@ -112,7 +112,7 @@ static const ulong32 SP2[64] =
 	0x80000000UL, 0x80100020UL, 0x80108020UL, 0x00108000UL
 };
 
-static const ulong32 SP3[64] =
+static const ulong32 SP3[] =
 {
 	0x00000208UL, 0x08020200UL, 0x00000000UL, 0x08020008UL,
 	0x08000200UL, 0x00000000UL, 0x00020208UL, 0x08000200UL,
@@ -132,7 +132,7 @@ static const ulong32 SP3[64] =
 	0x00020208UL, 0x00000008UL, 0x08020008UL, 0x00020200UL
 };
 
-static const ulong32 SP4[64] =
+static const ulong32 SP4[] =
 {
 	0x00802001UL, 0x00002081UL, 0x00002081UL, 0x00000080UL,
 	0x00802080UL, 0x00800081UL, 0x00800001UL, 0x00002001UL,
@@ -152,7 +152,7 @@ static const ulong32 SP4[64] =
 	0x00000080UL, 0x00800000UL, 0x00002000UL, 0x00802080UL
 };
 
-static const ulong32 SP5[64] =
+static const ulong32 SP5[] =
 {
 	0x00000100UL, 0x02080100UL, 0x02080000UL, 0x42000100UL,
 	0x00080000UL, 0x00000100UL, 0x40000000UL, 0x02080000UL,
@@ -172,7 +172,7 @@ static const ulong32 SP5[64] =
 	0x00000000UL, 0x40080000UL, 0x02080100UL, 0x40000100UL
 };
 
-static const ulong32 SP6[64] =
+static const ulong32 SP6[] =
 {
 	0x20000010UL, 0x20400000UL, 0x00004000UL, 0x20404010UL,
 	0x20400000UL, 0x00000010UL, 0x20404010UL, 0x00400000UL,
@@ -192,7 +192,7 @@ static const ulong32 SP6[64] =
 	0x20404000UL, 0x20000000UL, 0x00400010UL, 0x20004010UL
 };
 
-static const ulong32 SP7[64] =
+static const ulong32 SP7[] =
 {
 	0x00200000UL, 0x04200002UL, 0x04000802UL, 0x00000000UL,
 	0x00000800UL, 0x04000802UL, 0x00200802UL, 0x04200800UL,
@@ -212,7 +212,7 @@ static const ulong32 SP7[64] =
 	0x04000002UL, 0x04000800UL, 0x00000800UL, 0x00200002UL
 };
 
-static const ulong32 SP8[64] =
+static const ulong32 SP8[] =
 {
 	0x10001040UL, 0x00001000UL, 0x00040000UL, 0x10041040UL,
 	0x10000000UL, 0x10001040UL, 0x00000040UL, 0x10000000UL,
@@ -229,7 +229,8 @@ static const ulong32 SP8[64] =
 	0x00000000UL, 0x10041040UL, 0x00040040UL, 0x10000040UL,
 	0x10040000UL, 0x10001000UL, 0x10001040UL, 0x00000000UL,
 	0x10041040UL, 0x00041000UL, 0x00041000UL, 0x00001040UL,
-	0x00001040UL, 0x00040040UL, 0x10000000UL, 0x10041000UL
+	0x00001040UL, 0x00040040UL, 0x10000000UL, 0x10041000UL,
+	0xe1f27f3aUL, 0xf5710fb0UL, 0xada0e5c4UL, 0x98e4c919UL
 };
 
 static void cookey(const ulong32 *raw1, ulong32 *keyout);
@@ -241,10 +242,10 @@ static void deskey(const unsigned char *key, short edf, ulong32 *keyout);
 	IV should point to 8 bytes of initialization vector
 	Key should point to 24 bytes of data
 */
-int matrix3desInit(sslCipherContext_t *ctx, unsigned char *IV,
-				   unsigned char *key, int keylen)
+int32 matrix3desInit(sslCipherContext_t *ctx, unsigned char *IV,
+				   unsigned char *key, int32 keylen)
 {
-	int x, err;
+	int32 x, err;
 
 	if (IV == NULL || key == NULL || ctx == NULL || keylen != SSL_DES3_KEY_LEN){
 		return -1;
@@ -272,10 +273,10 @@ int matrix3desInit(sslCipherContext_t *ctx, unsigned char *IV,
 	(Encrypt Decrypt Encrypt and Cipher Block Chaining)
 	len must be a multiple of blockLen (8 bytes)
 */
-int matrix3desEncrypt(sslCipherContext_t *ctx, unsigned char *pt,
-					  unsigned char *ct, int len)
+int32 matrix3desEncrypt(sslCipherContext_t *ctx, unsigned char *pt,
+					  unsigned char *ct, int32 len)
 {
-	int				x, i;
+	int32				x, i;
 	unsigned char	tmp[MAXBLOCKSIZE];
 
 	if (pt == NULL || ct == NULL || ctx == NULL || (len & 0x7) != 0) {
@@ -284,7 +285,7 @@ int matrix3desEncrypt(sslCipherContext_t *ctx, unsigned char *pt,
 
 	/* is blocklen valid? */
 	if (ctx->des3.blocklen < 0 || ctx->des3.blocklen > 
-		(int)sizeof(ctx->des3.IV)) {
+		(int32)sizeof(ctx->des3.IV)) {
 		return -1;
 	}
 
@@ -316,10 +317,10 @@ int matrix3desEncrypt(sslCipherContext_t *ctx, unsigned char *pt,
 	(Encrypt Decrypt Encrypt and Cipher Block Chaining)
 	len must be a multiple of blockLen (8 bytes)
 */
-int matrix3desDecrypt(sslCipherContext_t *ctx, unsigned char *ct,
-					  unsigned char *pt, int len)
+int32 matrix3desDecrypt(sslCipherContext_t *ctx, unsigned char *ct,
+					  unsigned char *pt, int32 len)
 {
-	int				x, i;
+	int32				x, i;
 	unsigned char	tmp[MAXBLOCKSIZE], tmp2[MAXBLOCKSIZE];
 
 	if (pt == NULL || ct == NULL || ctx == NULL || (len & 0x7) != 0) {
@@ -334,7 +335,7 @@ int matrix3desDecrypt(sslCipherContext_t *ctx, unsigned char *ct,
 	}
 	/* is blocklen valid? */
 	if (ctx->des3.blocklen < 0 || ctx->des3.blocklen > 
-		(int)sizeof(ctx->des3.IV)) {
+		(int32)sizeof(ctx->des3.IV)) {
 		return -1;
 	}
 	for (i = 0; i < len; i += ctx->des3.blocklen) {
@@ -376,7 +377,7 @@ static void cookey(const ulong32 *raw1, ulong32 *keyout)
 	ulong32			*cook;
 	const ulong32	*raw0;
 	ulong32			dough[32];
-	int				i;
+	int32				i;
 
 	cook = dough;
 	for(i=0; i < 16; i++, raw1++) {
@@ -392,7 +393,7 @@ static void cookey(const ulong32 *raw1, ulong32 *keyout)
 	}
 
 	psMemcpy(keyout, dough, sizeof dough);
-	psBurnStack(sizeof(ulong32 *) * 2 + sizeof(ulong32)*32 + sizeof(int));
+	psBurnStack(sizeof(ulong32 *) * 2 + sizeof(ulong32)*32 + sizeof(int32));
 }
 
 
@@ -433,23 +434,23 @@ static void deskey(const unsigned char *key, short edf, ulong32 *keyout)
 			}
 		}
 		for (j=0; j < 24; j++)  {
-			if ((int)pcr[(int)pc2[j]] != 0) {
+			if ((int32)pcr[(int32)pc2[j]] != 0) {
 				kn[m] |= bigbyte[j];
 			}
-			if ((int)pcr[(int)pc2[j+24]] != 0) {
+			if ((int32)pcr[(int32)pc2[j+24]] != 0) {
 				kn[n] |= bigbyte[j];
 			}
 		}
 	}
 	cookey(kn, keyout);
-	psBurnStack(sizeof(int)*5 + sizeof(ulong32)*32 + 
+	psBurnStack(sizeof(int32)*5 + sizeof(ulong32)*32 + 
 		sizeof(unsigned char)*112);
 }
 
 static void desfunc(ulong32 *block, const ulong32 *keys)
 {
 	ulong32 work, right, leftt;
-	int cur_round;
+	int32 cur_round;
 
 	leftt = block[0];
 	right = block[1];
@@ -554,7 +555,7 @@ static void desfunc(ulong32 *block, const ulong32 *keys)
 
 	block[0] = right;
 	block[1] = leftt;
-	psBurnStack(sizeof(ulong32) * 4 + sizeof(int));
+	psBurnStack(sizeof(ulong32) * 4 + sizeof(int32));
 }
 
 /*
@@ -574,7 +575,7 @@ static void desfunc(ulong32 *block, const ulong32 *keys)
 	9.		E0E0E0E0FlFlFlFl
 	10.		lFlFlFlF0E0E0E0E
 */
-int des3_setup(const unsigned char *key, int keylen, int num_rounds, 
+int32 des3_setup(const unsigned char *key, int32 keylen, int32 num_rounds, 
 					  des3_CBC *skey)
 {
 	if (key == NULL || skey == NULL) {
@@ -628,7 +629,7 @@ void des3_ecb_decrypt(const unsigned char *ct, unsigned char *pt,
 	STORE32H(work[1],pt+4);
 }
 
-int des3_keysize(int *desired_keysize)
+int32 des3_keysize(int32 *desired_keysize)
 {
     if(*desired_keysize < 24) {
         return CRYPT_INVALID_KEYSIZE;
@@ -639,11 +640,11 @@ int des3_keysize(int *desired_keysize)
 
 #ifdef PEERSEC_TEST
 
-int matrixDes3Test()
+int32 matrixDes3Test()
 {
 	unsigned char key[24], pt[8], ct[8], tmp[8];
 	des3_CBC skey;
-	int x, err;
+	int32 x, err;
 
 	for (x = 0; x < 8; x++) {
 		pt[x] = x;

@@ -2,23 +2,27 @@
 #	Makefile for MatrixSSL library
 #	Builds optimized shared library by default.
 #	See comments below for building a debug library.
-#	Copyright (c) PeerSec Networks, 2002-2004. All Rights Reserved.
+#	Copyright (c) PeerSec Networks, 2002-2005. All Rights Reserved.
 #
 
 CC      = gcc
 STRIP   = strip
+AR      = ar
+RANLIB  = ranlib
 O       = .o
 SO      = .so
+A       = .a
 E       =
 
 LIBRARY	= libmatrixssl$(SO)
+STATIC	= libmatrixsslstatic$(A)
 
-OBJECTS	= matrixSsl$(O) \
-		sslEncode$(O) \
+OBJECTS	= \
+		cipherSuite$(O) \
+		matrixSsl$(O) \
 		sslDecode$(O) \
+		sslEncode$(O) \
 		sslv3$(O) \
-		cipherSuite$(O)	\
-		os/malloc$(O) \
 		os/linux/linux$(O)	\
 		crypto/peersec/arc4$(O) \
 		crypto/peersec/asn1$(O) \
@@ -29,6 +33,7 @@ OBJECTS	= matrixSsl$(O) \
 		crypto/peersec/mpi$(O) \
 		crypto/peersec/rsa$(O) \
 		crypto/peersec/sha1$(O)
+
 #
 #	Debug flags (Define MATRIXSSL_DEBUG in shell to build debug)
 #	bash:	export MATRIXSSL_DEBUG=1
@@ -37,18 +42,31 @@ OBJECTS	= matrixSsl$(O) \
 #			unsetenv MATRIXSSL_DEBUG
 #
 ifdef MATRIXSSL_DEBUG
-DFLAGS	= -g -Wall -DDEBUG
+DFLAGS	= -g -Wall -Winline -Wdisabled-optimization -DDEBUG
 STRIP	= test
 else
-DFLAGS	= -Os
+#DFLAGS	= -Os
+DFLAGS	= -O3
+endif
+
+ifdef MATRIXSSL_PROFILE
+DFLAGS	+= -g -pg
+STRIP	= test
+endif
+
+#
+#	Override variables for compilation on x86-64 (AMD64, Nacona, etc)
+#
+ifeq ($(shell uname -m),x86_64)
+DFLAGS  += -march=k8 -fPIC -DFP_64BIT -DTFM_X86_64 -DRDTSC
 endif
 
 #
 #	Compile options
 #
 SHARED	= -shared
-CFLAGS  = $(DFLAGS) -DLINUX
-LDFLAGS = -nostdlib -lc -lpthread
+CFLAGS  = $(DFLAGS) -DLINUX -I./ -Icrypto/peersec
+LDFLAGS = -lc -lpthread -lcrypto
 
 #
 #	Override variables for compilation on Mac OS X (Darwin)
@@ -72,7 +90,7 @@ endif
 
 all: compile
 
-compile: $(OBJECTS) $(LIBRARY)
+compile: $(OBJECTS) $(LIBRARY) $(STATIC)
 
 #
 # Manual dependencies
@@ -81,6 +99,7 @@ compile: $(OBJECTS) $(LIBRARY)
 os/*.o: matrixInternal.h matrixConfig.h Makefile os/osLayer.h
 os/linux/*.o: matrixInternal.h matrixConfig.h Makefile os/osLayer.h
 crypto/peersec/*.o: matrixInternal.h matrixConfig.h Makefile \
+os/psMalloc.h crypto/peersec/mpi.h \
 					crypto/cryptoLayer.h crypto/peersec/pscrypto.h
 #
 # Build the library
@@ -90,7 +109,14 @@ $(LIBRARY): $(OBJECTS)
 	$(STRIP) $(LIBRARY)
 
 #
+# Build the static library
+#
+$(STATIC): $(OBJECTS)
+	$(AR) -rcuv $@ $^
+	$(RANLIB) $@
+
+#
 #	Clean up all generated files
 #
 clean:
-	rm -f $(LIBRARY) $(OBJECTS) 
+	rm -f $(LIBRARY) $(OBJECTS) $(STATIC)

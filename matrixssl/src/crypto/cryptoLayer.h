@@ -1,6 +1,6 @@
 /*
  *	cryptoLayer.h
- *	Release $Name: MATRIXSSL_1_2_2_OPEN $
+ *	Release $Name: MATRIXSSL_1_2_4_OPEN $
  *
  *	Cryptography provider layered header.  This layer decouples
  *	the cryptography implementation from the SSL protocol implementation.
@@ -8,7 +8,7 @@
  *	externed below.
  */
 /*
- *	Copyright (c) PeerSec Networks, 2002-2004. All Rights Reserved.
+ *	Copyright (c) PeerSec Networks, 2002-2005. All Rights Reserved.
  *	The latest version of this code is available at http://www.matrixssl.org
  *
  *	This software is open source; you can redistribute it and/or modify
@@ -35,12 +35,18 @@
 #ifndef _h_CRYPTO_LAYER
 #define _h_CRYPTO_LAYER
 
+#include "../matrixConfig.h"
+
+/******************************************************************************/
+/*
+	Crypto may have some reliance on os layer (psMalloc in particular)
+*/
+#include "../os/osLayer.h"
+
 /*
 	Define the default crypto provider here
 */
 #define	USE_PEERSEC_CRYPTO
-
-#include "../matrixConfig.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -51,6 +57,7 @@ extern "C" {
 
 #define SSL_MAX_MAC_SIZE		20
 #define SSL_MAX_IV_SIZE			16
+#define SSL_MAX_BLOCK_SIZE		16
 #define SSL_MAX_SYM_KEY_SIZE	32
 /*
 	Enable the algorithms used for each cipher suite
@@ -117,62 +124,73 @@ extern "C" {
 #endif
 
 #ifdef USE_ARC4
-extern void matrixArc4Init(sslCipherContext_t *ctx, unsigned char *key, int keylen);
-extern int matrixArc4(sslCipherContext_t *ctx, unsigned char *in,
-					  unsigned char *out, int len);
+extern void matrixArc4Init(sslCipherContext_t *ctx, unsigned char *key, int32 keylen);
+extern int32 matrixArc4(sslCipherContext_t *ctx, unsigned char *in,
+					  unsigned char *out, int32 len);
 #endif /* USE_ARC4 */
 
 #ifdef USE_3DES
-extern int matrix3desInit(sslCipherContext_t *ctx, unsigned char *IV,
-						  unsigned char *key, int keylen);
-extern int matrix3desEncrypt(sslCipherContext_t *ctx, unsigned char *pt,\
-							 unsigned char *ct, int len);
-extern int matrix3desDecrypt(sslCipherContext_t *ctx, unsigned char *ct,
-							 unsigned char *pt, int len);
+extern int32 matrix3desInit(sslCipherContext_t *ctx, unsigned char *IV,
+						  unsigned char *key, int32 keylen);
+extern int32 matrix3desEncrypt(sslCipherContext_t *ctx, unsigned char *pt,\
+							 unsigned char *ct, int32 len);
+extern int32 matrix3desDecrypt(sslCipherContext_t *ctx, unsigned char *ct,
+							 unsigned char *pt, int32 len);
 #endif /* USE_3DES */
 
 extern void matrixMd5Init(sslMd5Context_t *ctx);
 extern void matrixMd5Update(sslMd5Context_t *ctx, const unsigned char *buf, unsigned long len);
-extern int matrixMd5Final(sslMd5Context_t *ctx, unsigned char *hash);
+extern int32 matrixMd5Final(sslMd5Context_t *ctx, unsigned char *hash);
 
 #ifdef USE_MD2
+/*
+	MD2 is provided for compatibility with V2 and older X509 certificates,
+	it is known to have security problems and should not be used for any current
+	development.
+*/
 extern void matrixMd2Init(sslMd2Context_t *ctx);
-extern int matrixMd2Update(sslMd2Context_t *ctx, const unsigned char *buf, unsigned long len);
-extern int matrixMd2Final(sslMd2Context_t *ctx, unsigned char *hash);
+extern int32 matrixMd2Update(sslMd2Context_t *ctx, const unsigned char *buf, unsigned long len);
+extern int32 matrixMd2Final(sslMd2Context_t *ctx, unsigned char *hash);
 #endif /* USE_MD2 */
 
 extern void matrixSha1Init(sslSha1Context_t *ctx);
 extern void matrixSha1Update(sslSha1Context_t *ctx, const unsigned char *buf, unsigned long len);
-extern int matrixSha1Final(sslSha1Context_t *ctx, unsigned char *hash);
+extern int32 matrixSha1Final(sslSha1Context_t *ctx, unsigned char *hash);
 
 #ifdef USE_RSA
 #ifdef USE_FILE_SYSTEM
-extern int matrixRsaReadCert(char *fileName, unsigned char **out, int *outLen);
-extern int matrixRsaReadPrivKey(char *fileName, char *password, sslRsaKey_t **key);
+extern int32 matrixRsaReadCert(char *fileName, unsigned char **out, int32 *outLen);
+extern int32 matrixRsaReadPrivKey(char *fileName, char *password, sslRsaKey_t **key);
 #endif /* USE_FILE_SYSTEM */
 
-extern int matrixRsaReadPrivKeyMem(char *keyBuf, int keyBufLen, char *password, sslRsaKey_t **key);
-extern int matrixRsaReadCertMem(char *certBuf, int certLen, unsigned char **out, int *outLen);
+extern int32 matrixRsaReadPrivKeyMem(char *keyBuf, int32 keyBufLen, char *password, sslRsaKey_t **key);
+extern int32 matrixRsaReadCertMem(char *certBuf, int32 certLen, unsigned char **out, int32 *outLen);
 
 extern void matrixRsaFreeKey(sslRsaKey_t *key);
 
-extern int matrixRsaEncryptPub(sslRsaKey_t *key, unsigned char *in, int inlen,
-							   unsigned char *out, int outlen);
-extern int matrixRsaDecryptPriv(sslRsaKey_t *key, unsigned char *in, int inlen,
-								unsigned char *out, int outlen);
-extern int matrixRsaEncryptPriv(sslRsaKey_t *key, unsigned char *in, int inlen,
-								unsigned char *out, int outlen);
-extern int matrixRsaDecryptPub(sslRsaKey_t *key, unsigned char *in, int inlen,
-							   unsigned char *out, int outlen);
+extern int32 matrixRsaEncryptPub(psPool_t *pool, sslRsaKey_t *key, 
+							   unsigned char *in, int32 inlen,
+							   unsigned char *out, int32 outlen);
+extern int32 matrixRsaDecryptPriv(psPool_t *pool, sslRsaKey_t *key, 
+								unsigned char *in, int32 inlen,
+								unsigned char *out, int32 outlen);
+extern int32 matrixRsaEncryptPriv(psPool_t *pool, sslRsaKey_t *key, 
+								unsigned char *in, int32 inlen,
+								unsigned char *out, int32 outlen);
+extern int32 matrixRsaDecryptPub(psPool_t *pool, sslRsaKey_t *key, 
+							   unsigned char *in, int32 inlen,
+							   unsigned char *out, int32 outlen);
+
+
 #endif /* USE_RSA */
 
 #ifdef USE_AES
-extern int matrixAesInit(sslCipherContext_t *ctx, unsigned char *IV,
-						 unsigned char *key, int keylen);
-extern int matrixAesEncrypt(sslCipherContext_t *ctx, unsigned char *pt,
-							unsigned char *ct, int len);
-extern int matrixAesDecrypt(sslCipherContext_t *ctx, unsigned char *ct,
-							unsigned char *pt, int len);
+extern int32 matrixAesInit(sslCipherContext_t *ctx, unsigned char *IV,
+						 unsigned char *key, int32 keylen);
+extern int32 matrixAesEncrypt(sslCipherContext_t *ctx, unsigned char *pt,
+							unsigned char *ct, int32 len);
+extern int32 matrixAesDecrypt(sslCipherContext_t *ctx, unsigned char *ct,
+							unsigned char *pt, int32 len);
 #endif /* USE_AES */
 
 /*
@@ -195,13 +213,13 @@ typedef struct {
 } sslSubjectAltName_t;
 
 typedef struct sslCertInfo {
-	int						verified;
+	int32						verified;
 	unsigned char			*serialNumber;
-	int						serialNumberLen;
+	int32						serialNumberLen;
 	char					*notBefore;
 	char					*notAfter;
 	char					*sigHash;
-	int						sigHashLen;
+	int32						sigHashLen;
 	sslSubjectAltName_t		subjectAltName;
 	sslDistinguishedName_t	subject;
 	sslDistinguishedName_t	issuer;
@@ -210,15 +228,16 @@ typedef struct sslCertInfo {
 
 #ifdef USE_X509
 
-extern int matrixX509ParseCert(unsigned char **certBuf, int certlen,
-							   sslRsaCert_t **cert);
+extern int32 matrixX509ParseCert(psPool_t *pool, unsigned char *certBuf, 
+							   int32 certlen, sslRsaCert_t **cert);
 extern void matrixX509FreeCert(sslRsaCert_t *cert);
-extern int matrixX509ValidateCert(sslRsaCert_t *subjectCert,
-								  sslRsaCert_t *issuerCert, int chain);
-extern int matrixX509ValidateChain(sslRsaCert_t *chain,
+extern int32 matrixX509ValidateCert(psPool_t *pool, sslRsaCert_t *subjectCert,
+								  sslRsaCert_t *issuerCert);
+extern int32 matrixX509ValidateChain(psPool_t *pool, sslRsaCert_t *chain,
 								   sslRsaCert_t **subjectCert);
-extern int matrixX509UserValidator(sslRsaCert_t *subjectCert,
-						int (*certValidator)(sslCertInfo_t *t, void *arg),
+extern int32 matrixX509UserValidator(psPool_t *pool, 
+						sslRsaCert_t *subjectCert,
+						int32 (*certValidator)(sslCertInfo_t *t, void *arg),
 						void *arg);
 #endif /* USE_X509 */
 
@@ -229,3 +248,4 @@ extern int matrixX509UserValidator(sslRsaCert_t *subjectCert,
 #endif /* _h_CRYPTO_LAYER */
 
 /******************************************************************************/
+

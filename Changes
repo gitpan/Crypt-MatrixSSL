@@ -19,3 +19,7 @@ Revision history for Perl extension Crypt::MatrixSSL.
 	- Some Linux installs failed to test without a library
 	- My Windows PC destroyed the CaSe of some important files during "make dist"
 
+0.05  Mon Mar 28 01:50:13 GMT 2005
+	- Updated to use matrixssl-1-2-4
+	- Scripted the header-file-adjustents so Win32 compilations properly "inline" future releases too
+

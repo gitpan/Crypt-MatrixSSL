@@ -1,12 +1,12 @@
 /*
  *	httpReflector.c
- *	Release $Name: MATRIXSSL_1_2_2_OPEN $
+ *	Release $Name: MATRIXSSL_1_2_4_OPEN $
  *
  *	Simple example program for MatrixSSL
  *	Accepts a HTTPS request and echos the response back to the sender.
  */
 /*
- *	Copyright (c) PeerSec Networks, 2002-2004. All Rights Reserved.
+ *	Copyright (c) PeerSec Networks, 2002-2005. All Rights Reserved.
  *	The latest version of this code is available at http://www.matrixssl.org
  *
  *	This software is open source; you can redistribute it and/or modify
@@ -43,7 +43,7 @@ static char keyfile[] = "privkeySrv.pem";
 static char certfile[] = "certSrv.pem";
 static char CAfile[] = "CAcertCln.pem";
 
-static const char responseHdr[] = "HTTP/1.1 200 OK\r\n"
+static const char responseHdr[] = "HTTP/1.0 200 OK\r\n"
 		"Server: PeerSec Networks MatrixSSL\r\n"
 		"Pragma: no-cache\r\n"
 		"Cache-Control: no-cache\r\n"
@@ -102,6 +102,7 @@ int main(int argc, char **argv)
 			certfile, keyfile);
 		goto promptAndExit;
 	}
+
 	fprintf(stdout, 
 		"Run httpsClient or type https://127.0.0.1:%d into your local Web browser.\n",
 		HTTPS_PORT);
@@ -269,6 +270,7 @@ static int certChecker(sslCertInfo_t *cert, void *arg)
 }	
 
 /******************************************************************************/
+
 
 
 

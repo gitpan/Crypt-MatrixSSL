@@ -1,15 +1,17 @@
 #
 #	MatrixSSL example applications makefile
 #	Builds optimized by default, see comments below for debug.
-#	Copyright (c) PeerSec Networks, 2002-2004. All Rights Reserved
+#	Copyright (c) PeerSec Networks, 2002-2005. All Rights Reserved
 #
 
 CC 	= gcc
 O 	= .o
 SO  = .so
+A   = .a
 E	=
 
 LIBRARIES	= ../src/libmatrixssl$(SO)
+STATICS		= ../src/libmatrixsslstatic$(A)
 
 REF_EXE 	= httpsReflector$(E)
 REF_OBJS 	= httpsReflector$(O) sslSocket$(O)
@@ -27,7 +29,19 @@ CLIENT_OBJS = httpsClient$(O) sslSocket$(O)
 ifdef MATRIXSSL_DEBUG
 DFLAGS  = -g -Wall -DDEBUG
 else
-DFLAGS  = -Os
+#DFLAGS	= -Os
+DFLAGS	= -O3
+endif
+
+ifdef MATRIXSSL_PROFILE
+DFLAGS	+= -g -pg
+endif
+
+#
+#   Override variables for compilation on x86-64 (AMD64, Nacona, etc)
+#
+ifeq ($(shell uname -m),x86_64)
+DFLAGS	+= -march=k8 -fPIC -DFP_64BIT -DTFM_X86_64 -DRDTSC
 endif
 
 #
@@ -56,7 +70,7 @@ endif
 
 all: compile
 
-compile: $(REF_OBJS) $(REF_EXE) $(CLIENT_EXE) $(CLIENT_OBJS)
+compile: $(REF_OBJS) $(REF_EXE) $(CLIENT_OBJS) $(CLIENT_EXE)
 
 #
 # Manual dependencies
@@ -68,8 +82,11 @@ $(REF_EXE):$(REF_OBJS)
 
 $(CLIENT_EXE):$(CLIENT_OBJS)
 	$(CC) -o $@ $^ $(LDFLAGS) $(LIBRARIES)
+
+
 #
 #	Clean up all generated files
 #
 clean:
-	rm -f $(REF_EXE) $(REF_OBJS) $(CLIENT_EXE) $(CLIENT_OBJS)
+	rm -f $(REF_EXE) $(REF_OBJS) \
+		$(CLIENT_EXE) $(CLIENT_OBJS)

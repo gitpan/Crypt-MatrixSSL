@@ -1,11 +1,11 @@
 /*	
  *	mpi.h
- *	Release $Name: MATRIXSSL_1_2_2_OPEN $
+ *	Release $Name: MATRIXSSL_1_2_4_OPEN $
  *
  *	multiple-precision integer library
  */
 /*
- *	Copyright (c) PeerSec Networks, 2002-2004. All Rights Reserved.
+ *	Copyright (c) PeerSec Networks, 2002-2005. All Rights Reserved.
  *	The latest version of this code is available at http://www.matrixssl.org
  *
  *	This software is open source; you can redistribute it and/or modify
@@ -29,8 +29,8 @@
  */
 /******************************************************************************/
 
-#ifndef BN_H_
-#define BN_H_
+#ifndef _h_MPI
+#define _h_MPI
 
 #include <stdio.h>
 #include <string.h>
@@ -126,7 +126,7 @@ extern "C" {
 	a mp_digit
  */
 #ifndef DIGIT_BIT
-	#define DIGIT_BIT	((int)((CHAR_BIT * sizeof(mp_digit) - 1)))	/* bits per digit */
+	#define DIGIT_BIT	((int32)((CHAR_BIT * sizeof(mp_digit) - 1)))	/* bits per digit */
 #endif /* DIGIT_BIT */
 
 #define MP_DIGIT_BIT		DIGIT_BIT
@@ -152,7 +152,7 @@ extern "C" {
 #define MP_YES			1		/* yes response */
 #define MP_NO			0		/* no response */
 
-typedef int				mp_err;
+typedef int32				mp_err;
 
 /******************************************************************************/
 /*
@@ -172,7 +172,7 @@ typedef int				mp_err;
 #define MP_WARRAY		(1 << (sizeof(mp_word) * CHAR_BIT - 2 * DIGIT_BIT + 1))
 
 typedef struct  {
-	int used, alloc, sign;
+	int32 used, alloc, sign;
 	mp_digit *dp;
 } mp_int;
 
@@ -188,7 +188,7 @@ typedef struct  {
 /*
 	init a bignum
  */
-extern int mp_init(mp_int *a);
+extern int32 mp_init(psPool_t *pool, mp_int *a);
 
 /*
 	free a bignum
@@ -198,8 +198,9 @@ extern void mp_clear(mp_int *a);
 /*
 	init a series of arguments
  */
-extern int _mp_init_multi(mp_int *mp0, mp_int *mp1, mp_int *mp2, mp_int *mp3,
-					mp_int *mp4, mp_int *mp5, mp_int *mp6, mp_int *mp7);
+extern int32 _mp_init_multi(psPool_t *pool, mp_int *mp0, mp_int *mp1, mp_int *mp2, 
+							mp_int *mp3, mp_int *mp4, mp_int *mp5, mp_int *mp6, 
+							mp_int *mp7);
 
 /*
 	clear a  series of arguments
@@ -215,17 +216,17 @@ extern void mp_exch(mp_int *a, mp_int *b);
 /*
 	shrink ram required for a bignum
  */
-extern int mp_shrink(mp_int *a);
+extern int32 mp_shrink(mp_int *a);
 
 /*
-	grow an int to a given size
+	grow an int32 to a given size
  */
-extern int mp_grow(mp_int *a, int size);
+extern int32 mp_grow(mp_int *a, int32 size);
 
 /*
 	init to a given number of digits
  */
-extern int mp_init_size(mp_int *a, int size);
+extern int32 mp_init_size(psPool_t *pool, mp_int *a, int32 size);
 
 /******************************************************************************/
 /*
@@ -248,12 +249,12 @@ extern void mp_set(mp_int *a, mp_digit b);
 /*
 	copy, b = a
  */
-extern int mp_copy(mp_int *a, mp_int *b);
+extern int32 mp_copy(mp_int *a, mp_int *b);
 
 /*
 	inits and copies, a = b
  */
-extern int mp_init_copy(mp_int *a, mp_int *b);
+extern int32 mp_init_copy(psPool_t *pool, mp_int *a, mp_int *b);
 
 /*
 	trim unused digits
@@ -268,37 +269,37 @@ extern void mp_clamp(mp_int *a);
 /*
 	right shift by "b" digits
  */
-extern void mp_rshd(mp_int *a, int b);
+extern void mp_rshd(mp_int *a, int32 b);
 
 /*
 	left shift by "b" digits
  */
-extern int mp_lshd(mp_int *a, int b);
+extern int32 mp_lshd(mp_int *a, int32 b);
 
 /*
 	c = a / 2**b
  */
-extern int mp_div_2d(mp_int *a, int b, mp_int *c, mp_int *d);
+extern int32 mp_div_2d(psPool_t *pool, mp_int *a, int32 b, mp_int *c, mp_int *d);
 
 /*
 	b = a/2
  */
-extern int mp_div_2(mp_int *a, mp_int *b);
+extern int32 mp_div_2(mp_int *a, mp_int *b);
 
 /*
 	c = a * 2**b
  */
-extern int mp_mul_2d(mp_int *a, int b, mp_int *c);
+extern int32 mp_mul_2d(mp_int *a, int32 b, mp_int *c);
 
 /*
 	c = a mod 2**d
  */
-extern int mp_mod_2d(mp_int *a, int b, mp_int *c);
+extern int32 mp_mod_2d(mp_int *a, int32 b, mp_int *c);
 
 /*
 	computes a = 2**b
  */
-extern int mp_2expt(mp_int *a, int b);
+extern int32 mp_2expt(mp_int *a, int32 b);
 
 /******************************************************************************/
 /*
@@ -308,51 +309,51 @@ extern int mp_2expt(mp_int *a, int b);
 /*
 	b = -a
  */
-extern int mp_neg(mp_int *a, mp_int *b);
+extern int32 mp_neg(mp_int *a, mp_int *b);
 
 /*
 	b = |a|
  */
-extern int mp_abs(mp_int *a, mp_int *b);
+extern int32 mp_abs(mp_int *a, mp_int *b);
 
 /*
 	compare a to b
  */
-extern int mp_cmp(mp_int *a, mp_int *b);
+extern int32 mp_cmp(mp_int *a, mp_int *b);
 
 /*
 	compare |a| to |b|
  */
-extern int mp_cmp_mag(mp_int *a, mp_int *b);
+extern int32 mp_cmp_mag(mp_int *a, mp_int *b);
 
 /*
 	c = a + b
  */
-extern int mp_add(mp_int *a, mp_int *b, mp_int *c);
+extern int32 mp_add(mp_int *a, mp_int *b, mp_int *c);
 
 /*
 	c = a - b
  */
-extern int mp_sub(mp_int *a, mp_int *b, mp_int *c);
+extern int32 mp_sub(mp_int *a, mp_int *b, mp_int *c);
 
 /*
 	c = a * b
 	b = a*a
  */
 #ifdef USE_SLOW_MPI
-extern int mp_mul(mp_int *a, mp_int *b, mp_int *c);
-extern int mp_sqr(mp_int *a, mp_int *b);
+extern int32 mp_mul(psPool_t *pool, mp_int *a, mp_int *b, mp_int *c);
+extern int32 mp_sqr(psPool_t *pool, mp_int *a, mp_int *b);
 #endif
 
 /*
 	a/b => cb + d == a
  */
-extern int mp_div(mp_int *a, mp_int *b, mp_int *c, mp_int *d);
+extern int32 mp_div(psPool_t *pool, mp_int *a, mp_int *b, mp_int *c, mp_int *d);
 
 /*
 	c = a mod b, 0 <= c < b
  */
-extern int mp_mod(mp_int *a, mp_int *b, mp_int *c);
+extern int32 mp_mod(psPool_t *pool, mp_int *a, mp_int *b, mp_int *c);
 
 /******************************************************************************/
 /*
@@ -362,12 +363,12 @@ extern int mp_mod(mp_int *a, mp_int *b, mp_int *c);
 /*
 	compare against a single digit
  */
-extern int mp_cmp_d(mp_int *a, mp_digit b);
+extern int32 mp_cmp_d(mp_int *a, mp_digit b);
 
 /*
 	c = a * b
  */
-extern int mp_mul_d(mp_int *a, mp_digit b, mp_int *c);
+extern int32 mp_mul_d(mp_int *a, mp_digit b, mp_int *c);
 
 /******************************************************************************/
 /*
@@ -377,18 +378,18 @@ extern int mp_mul_d(mp_int *a, mp_digit b, mp_int *c);
 /*
 	d = a + b (mod c)
  */
-extern int mp_addmod(mp_int *a, mp_int *b, mp_int *c, mp_int *d);
+extern int32 mp_addmod(psPool_t *pool, mp_int *a, mp_int *b, mp_int *c, mp_int *d);
 
 /*
 	d = a * b (mod c)
  */
-extern int mp_mulmod(mp_int *a, mp_int *b, mp_int *c, mp_int *d);
+extern int32 mp_mulmod(psPool_t *pool, mp_int *a, mp_int *b, mp_int *c, mp_int *d);
 
 /*
 	c = 1/a (mod b)
  */
 #ifdef USE_SLOW_MPI
-extern int mp_invmod(mp_int *a, mp_int *b, mp_int *c);
+extern int32 mp_invmod(psPool_t *pool, mp_int *a, mp_int *b, mp_int *c);
 #endif
 
 /*
@@ -397,30 +398,30 @@ extern int mp_invmod(mp_int *a, mp_int *b, mp_int *c);
 	Assumes that 0 < a <= b*b, note if 0 > a > -(b*b) then you can merely
 	compute the reduction as -1 * mp_reduce(mp_abs(a)) [pseudo code].
  */
-extern int mp_reduce(mp_int *a, mp_int *b, mp_int *c);
+extern int32 mp_reduce(mp_int *a, mp_int *b, mp_int *c);
 
 /*
 	setups the montgomery reduction
  */
-extern int mp_montgomery_setup(mp_int *a, mp_digit *mp);
+extern int32 mp_montgomery_setup(mp_int *a, mp_digit *mp);
 
 /*
 	computes a = B**n mod b without division or multiplication useful for
 	normalizing numbers in a Montgomery system.
  */
-extern int mp_montgomery_calc_normalization(mp_int *a, mp_int *b);
+extern int32 mp_montgomery_calc_normalization(mp_int *a, mp_int *b);
 
 /*
 	computes x/R == x (mod N) via Montgomery Reduction
  */
 #ifdef USE_SLOW_MPI
-extern int mp_montgomery_reduce(mp_int *a, mp_int *m, mp_digit mp);
+extern int32 mp_montgomery_reduce(mp_int *a, mp_int *m, mp_digit mp);
 #endif
 
 /*
 	d = a**b (mod c)
  */
-extern int mp_exptmod(mp_int *a, mp_int *b, mp_int *c, mp_int *d);
+extern int32 mp_exptmod(psPool_t *pool, mp_int *a, mp_int *b, mp_int *c, mp_int *d);
 
 /******************************************************************************/
 /*
@@ -430,13 +431,14 @@ extern int mp_exptmod(mp_int *a, mp_int *b, mp_int *c, mp_int *d);
 	is done at runtime.
 */
 #ifdef USE_SLOW_MPI
-extern int s_mp_mul_digs(mp_int *a, mp_int *b, mp_int *c, int digs);
-extern int s_mp_mul_high_digs(mp_int *a, mp_int *b, mp_int *c, int digs);
-extern int s_mp_sqr(mp_int *a, mp_int *b);
+extern int32 s_mp_mul_digs(psPool_t *pool, mp_int *a, mp_int *b, mp_int *c,
+						   int32 digs);
+extern int32 s_mp_mul_high_digs(mp_int *a, mp_int *b, mp_int *c, int32 digs);
+extern int32 s_mp_sqr(psPool_t *pool, mp_int *a, mp_int *b);
 #else
 #define mp_montgomery_reduce fast_mp_montgomery_reduce
 #define mp_sqr	fast_s_mp_sqr
-#define mp_mul(A, B, C) fast_s_mp_mul_digs(A, B, C, (A)->used + (B)->used + 1)
+#define mp_mul(P, A, B, C) fast_s_mp_mul_digs(P, A, B, C, (A)->used + (B)->used + 1)
 #define s_mp_mul_digs	fast_s_mp_mul_digs
 #define s_mp_mul_high_digs	fast_s_mp_mul_high_digs
 #define mp_invmod	fast_mp_invmod
@@ -446,45 +448,45 @@ extern int s_mp_sqr(mp_int *a, mp_int *b);
 /*
 	radix conversion
  */
-extern int mp_count_bits(mp_int *a);
+extern int32 mp_count_bits(mp_int *a);
 
-extern int mp_unsigned_bin_size(mp_int *a);
-extern int mp_read_unsigned_bin(mp_int *a, unsigned char *b, int c);
-extern int mp_to_unsigned_bin(mp_int *a, unsigned char *b);
+extern int32 mp_unsigned_bin_size(mp_int *a);
+extern int32 mp_read_unsigned_bin(mp_int *a, unsigned char *b, int32 c);
+extern int32 mp_to_unsigned_bin(psPool_t *pool, mp_int *a, unsigned char *b);
 
-extern int mp_signed_bin_size(mp_int *a);
-extern int mp_read_signed_bin(mp_int *a, unsigned char *b, int c);
-extern int mp_to_signed_bin(mp_int *a, unsigned char *b);
+extern int32 mp_signed_bin_size(mp_int *a);
+extern int32 mp_read_signed_bin(mp_int *a, unsigned char *b, int32 c);
+extern int32 mp_to_signed_bin(mp_int *a, unsigned char *b);
 
 /*
 	lowlevel functions, do not call!
  */
 #ifdef USE_SLOW_MPI
-#define s_mp_mul(A, B, C) s_mp_mul_digs(A, B, C, (A)->used + (B)->used + 1)
+#define s_mp_mul(P, A, B, C) s_mp_mul_digs(P, A, B, C, (A)->used + (B)->used + 1)
 #else
-#define s_mp_mul(A, B, C) sslAssert();
+#define s_mp_mul(P, A, B, C) sslAssert();
 #endif
 
 /*
 	b = a*2
  */
-extern int mp_mul_2(mp_int *a, mp_int *b);
+extern int32 mp_mul_2(mp_int *a, mp_int *b);
 
-extern int s_mp_add(mp_int *a, mp_int *b, mp_int *c);
-extern int s_mp_sub(mp_int *a, mp_int *b, mp_int *c);
+extern int32 s_mp_add(mp_int *a, mp_int *b, mp_int *c);
+extern int32 s_mp_sub(mp_int *a, mp_int *b, mp_int *c);
 
-extern int fast_s_mp_mul_digs(mp_int *a, mp_int *b, mp_int *c, int digs);
-extern int fast_s_mp_mul_high_digs(mp_int *a, mp_int *b, mp_int *c, int digs);
-extern int fast_s_mp_sqr(mp_int *a, mp_int *b);
-extern int fast_mp_invmod(mp_int *a, mp_int *b, mp_int *c);
-extern int fast_mp_montgomery_reduce(mp_int *a, mp_int *m, mp_digit mp);
+extern int32 fast_s_mp_mul_digs(psPool_t *pool, mp_int *a, mp_int *b, mp_int *c,
+								int32 digs);
+extern int32 fast_s_mp_mul_high_digs(mp_int *a, mp_int *b, mp_int *c, int32 digs);
+extern int32 fast_s_mp_sqr(psPool_t *pool, mp_int *a, mp_int *b);
+extern int32 fast_mp_invmod(psPool_t *pool, mp_int *a, mp_int *b, mp_int *c);
+extern int32 fast_mp_montgomery_reduce(mp_int *a, mp_int *m, mp_digit mp);
 
-extern void bn_reverse(unsigned char *s, int len);
+extern void bn_reverse(unsigned char *s, int32 len);
 
 #ifdef __cplusplus
    }
 #endif /* __cplusplus */
 
-#endif /* ?BN_H_ */
+#endif /* _h_MPI */
 
-/******************************************************************************/

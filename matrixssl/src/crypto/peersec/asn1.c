@@ -1,11 +1,11 @@
 /*
  *	asn1.c
- *	Release $Name: MATRIXSSL_1_2_2_OPEN $
+ *	Release $Name: MATRIXSSL_1_2_4_OPEN $
  *
  *	DER/BER coding
  */
 /*
- *	Copyright (c) PeerSec Networks, 2002-2004. All Rights Reserved.
+ *	Copyright (c) PeerSec Networks, 2002-2005. All Rights Reserved.
  *	The latest version of this code is available at http://www.matrixssl.org
  *
  *	This software is open source; you can redistribute it and/or modify
@@ -31,29 +31,30 @@
 
 #include "../cryptoLayer.h"
 
-static int asnParseLength(unsigned char **p, int size, int *valLen);
-static int getBig(unsigned char **pp, int len, mp_int *big);
-static int getSerialNum(unsigned char **pp, int len, unsigned char **sn,
-						int *snLen);
-static int getInteger(unsigned char **pp, int len, int *val);
-static int getSequence(unsigned char **pp, int len, int *outLen);
-static int getSet(unsigned char **pp, int len, int *outLen);
-static int getExplicitVersion(unsigned char **pp, int len, int expVal,
-							  int *outLen);
-static int getAlgorithmIdentifier(unsigned char **pp, int len, int *oi,
-								  int isPubKey);
-static int getValidity(unsigned char **pp, int len, char **notBefore,
-					   char **notAfter);
-static int getSignature(unsigned char **pp, int len,
-						unsigned char **sig, int *sigLen);
-static int getImplicitBitString(unsigned char **pp, int len, int impVal,
-						unsigned char **bitString, int *bitLen);
-static int getPubKey(unsigned char **pp, int len, sslRsaKey_t *pubKey);
+static int32 asnParseLength(unsigned char **p, int32 size, int32 *valLen);
+static int32 getBig(psPool_t *pool, unsigned char **pp, int32 len, mp_int *big);
+static int32 getSerialNum(psPool_t *pool, unsigned char **pp, int32 len, 
+						unsigned char **sn, int32 *snLen);
+static int32 getInteger(unsigned char **pp, int32 len, int32 *val);
+static int32 getSequence(unsigned char **pp, int32 len, int32 *outLen);
+static int32 getSet(unsigned char **pp, int32 len, int32 *outLen);
+static int32 getExplicitVersion(unsigned char **pp, int32 len, int32 expVal,
+							  int32 *outLen);
+static int32 getAlgorithmIdentifier(unsigned char **pp, int32 len, int32 *oi,
+								  int32 isPubKey);
+static int32 getValidity(psPool_t *pool, unsigned char **pp, int32 len, 
+					   char **notBefore, char **notAfter);
+static int32 getSignature(psPool_t *pool, unsigned char **pp, int32 len,
+						unsigned char **sig, int32 *sigLen);
+static int32 getImplicitBitString(psPool_t *pool, unsigned char **pp, int32 len, 
+						int32 impVal, unsigned char **bitString, int32 *bitLen);
+static int32 getPubKey(psPool_t *pool, unsigned char **pp, int32 len, sslRsaKey_t *pubKey);
 
 #ifdef USE_X509
-static int getExplicitExtensions(unsigned char **pp, int len, int expVal,
+static int32 getExplicitExtensions(psPool_t *pool, unsigned char **pp, 
+								 int32 len, int32 expVal,
 								 v3extensions_t *extensions);
-static int getDNAttributes(unsigned char **pp, int len,
+static int32 getDNAttributes(psPool_t *pool, unsigned char **pp, int32 len,
 						   DNattributes_t *attribs);
 #endif /* USE_X509 */
 
@@ -122,10 +123,10 @@ static int getDNAttributes(unsigned char **pp, int len,
 	returned if they are present
 */
 
-int psAsnParsePrivateKey(unsigned char **pp, int size, sslRsaKey_t *key)
+int32 psAsnParsePrivateKey(psPool_t *pool, unsigned char **pp, int32 size, sslRsaKey_t *key)
 {
 	unsigned char	*p, *end, *seq;
-	int				version, seqlen;
+	int32			version, seqlen;
 
 	key->optimized = 0;
 	p = *pp;
@@ -136,16 +137,16 @@ int psAsnParsePrivateKey(unsigned char **pp, int size, sslRsaKey_t *key)
 		return -1;
 	}
 	seq = p;
-	if (getInteger(&p, (int)(end - p), &version) < 0 || version != 0 ||
-		getBig(&p, (int)(end - p), &(key->N)) < 0 ||
-		getBig(&p, (int)(end - p), &(key->e)) < 0 ||
-		getBig(&p, (int)(end - p), &(key->d)) < 0 ||
-		getBig(&p, (int)(end - p), &(key->p)) < 0 ||
-		getBig(&p, (int)(end - p), &(key->q)) < 0 ||
-		getBig(&p, (int)(end - p), &(key->dP)) < 0 ||
-		getBig(&p, (int)(end - p), &(key->dQ)) < 0 ||
-		getBig(&p, (int)(end - p), &(key->qP)) < 0 ||
-		(int)(p - seq) != seqlen) {
+	if (getInteger(&p, (int32)(end - p), &version) < 0 || version != 0 ||
+		getBig(pool, &p, (int32)(end - p), &(key->N)) < 0 ||
+		getBig(pool, &p, (int32)(end - p), &(key->e)) < 0 ||
+		getBig(pool, &p, (int32)(end - p), &(key->d)) < 0 ||
+		getBig(pool, &p, (int32)(end - p), &(key->p)) < 0 ||
+		getBig(pool, &p, (int32)(end - p), &(key->q)) < 0 ||
+		getBig(pool, &p, (int32)(end - p), &(key->dP)) < 0 ||
+		getBig(pool, &p, (int32)(end - p), &(key->dQ)) < 0 ||
+		getBig(pool, &p, (int32)(end - p), &(key->qP)) < 0 ||
+		(int32)(p - seq) != seqlen) {
 		matrixStrDebugMsg("ASN key extract parse error\n", NULL);
 		return -1;
 	}
@@ -157,19 +158,19 @@ int psAsnParsePrivateKey(unsigned char **pp, int size, sslRsaKey_t *key)
 
 /*
 	Compute the optimization members.  The qP is stored in the file but
-	does not match the optimization algorithms used by libTomCrypt, so
+	does not match the optimization algorithms used by mpi, so
 	recompute it here along with adding pQ.
 */	
-	if (mp_invmod(&key->q, &key->p, &key->qP) != MP_OKAY) {
+	if (mp_invmod(pool, &key->q, &key->p, &key->qP) != MP_OKAY) {
 		goto done;
 	}
-	if (mp_mulmod(&key->qP, &key->q, &key->N, &key->qP) != MP_OKAY) {
+	if (mp_mulmod(pool, &key->qP, &key->q, &key->N, &key->qP) != MP_OKAY) {
 		goto done;
 	}
-	if (mp_invmod(&key->p, &key->q, &key->pQ) != MP_OKAY) { 
+	if (mp_invmod(pool, &key->p, &key->q, &key->pQ) != MP_OKAY) { 
 		goto done;
 	}
-	if (mp_mulmod(&key->pQ, &key->p, &key->N, &key->pQ)) { 
+	if (mp_mulmod(pool, &key->pQ, &key->p, &key->N, &key->pQ)) { 
 		goto done;
 	}
 	
@@ -197,13 +198,14 @@ done:
 	Parse an X509 ASN.1 certificate stream
 	http://www.faqs.org/rfcs/rfc2459.html section 4.1
 */
-int matrixX509ParseCert(unsigned char **pp, int size, sslRsaCert_t **outcert)
+int32 matrixX509ParseCert(psPool_t *pool, unsigned char *pp, int32 size, 
+						sslRsaCert_t **outcert)
 {
 	sslRsaCert_t		*cert;
 	sslMd5Context_t		md5Ctx;
 	sslSha1Context_t	sha1Ctx;
 	unsigned char		*p, *end, *certStart, *certEnd;
-	int					certLen, len;
+	int32				certLen, len;
 #ifdef USE_MD2
 	sslMd2Context_t		md2Ctx;
 #endif /* USE_MD2 */
@@ -214,10 +216,13 @@ int matrixX509ParseCert(unsigned char **pp, int size, sslRsaCert_t **outcert)
 	memset is important because the test for NULL is what is used
 	to determine what to free
 */
-	*outcert = cert = psMalloc(sizeof(sslRsaCert_t));
+	*outcert = cert = psMalloc(pool, sizeof(sslRsaCert_t));
+	if (cert == NULL) {
+		return -8; /* SSL_MEM_ERROR */
+	}
 	memset(cert, '\0', sizeof(sslRsaCert_t));
 
-	p = *pp;
+	p = pp;
 	end = p + size;
 /*
 	Certificate  ::=  SEQUENCE  {
@@ -225,7 +230,7 @@ int matrixX509ParseCert(unsigned char **pp, int size, sslRsaCert_t **outcert)
 		signatureAlgorithm	AlgorithmIdentifier,
 		signatureValue		BIT STRING	}
 */
-	if (getSequence(&p, (int)(end - p), &len) < 0) {
+	if (getSequence(&p, (int32)(end - p), &len) < 0) {
 		matrixStrDebugMsg("Initial cert parse error\n", NULL);
 		return -1;
 	}
@@ -246,17 +251,17 @@ int matrixX509ParseCert(unsigned char **pp, int size, sslRsaCert_t **outcert)
 		extensions		[3]	EXPLICIT Extensions OPTIONAL
 							-- If present, version shall be v3	}
 */
-	if (getSequence(&p, (int)(end - p), &len) < 0) {
+	if (getSequence(&p, (int32)(end - p), &len) < 0) {
 		matrixStrDebugMsg("ASN sequence parse error\n", NULL);
 		return -1;
 	}
 	certEnd = p + len;
-	certLen = (int)(certEnd - certStart);
+	certLen = (int32)(certEnd - certStart);
 
 /*
 	Version  ::=  INTEGER  {  v1(0), v2(1), v3(2)  }
 */
-	if (getExplicitVersion(&p, (int)(end - p), 0, &cert->version) < 0) {
+	if (getExplicitVersion(&p, (int32)(end - p), 0, &cert->version) < 0) {
 		matrixStrDebugMsg("ASN version parse error\n", NULL);
 		return -1;
 	}
@@ -267,7 +272,7 @@ int matrixX509ParseCert(unsigned char **pp, int size, sslRsaCert_t **outcert)
 /*
 	CertificateSerialNumber  ::=  INTEGER
 */
-	if (getSerialNum(&p, (int)(end - p), &cert->serialNumber,
+	if (getSerialNum(pool, &p, (int32)(end - p), &cert->serialNumber,
 			&cert->serialNumberLen) < 0) {
 		matrixStrDebugMsg("ASN serial number parse error\n", NULL);
 		return -1;
@@ -277,7 +282,7 @@ int matrixX509ParseCert(unsigned char **pp, int size, sslRsaCert_t **outcert)
 		algorithm				OBJECT IDENTIFIER,
 		parameters				ANY DEFINED BY algorithm OPTIONAL }
 */
-	if (getAlgorithmIdentifier(&p, (int)(end - p),
+	if (getAlgorithmIdentifier(&p, (int32)(end - p),
 			&cert->certAlgorithm, 0) < 0) {
 		return -1;
 	}
@@ -297,7 +302,7 @@ int matrixX509ParseCert(unsigned char **pp, int size, sslRsaCert_t **outcert)
 
 	AttributeValue ::= ANY DEFINED BY AttributeType
 */
-	if (getDNAttributes(&p, (int)(end - p), &cert->issuer) < 0) {
+	if (getDNAttributes(pool, &p, (int32)(end - p), &cert->issuer) < 0) {
 		return -1;
 	}
 /*
@@ -305,14 +310,14 @@ int matrixX509ParseCert(unsigned char **pp, int size, sslRsaCert_t **outcert)
 		notBefore	Time,
 		notAfter	Time	}
 */
-	if (getValidity(&p, (int)(end - p), &cert->notBefore,
+	if (getValidity(pool, &p, (int32)(end - p), &cert->notBefore,
 			&cert->notAfter) < 0) {
 		return -1;
 	}
 /*
 	Subject DN
 */
-	if (getDNAttributes(&p, (int)(end - p), &cert->subject) < 0) {
+	if (getDNAttributes(pool, &p, (int32)(end - p), &cert->subject) < 0) {
 		return -1;
 	}
 /*
@@ -320,25 +325,25 @@ int matrixX509ParseCert(unsigned char **pp, int size, sslRsaCert_t **outcert)
 		algorithm			AlgorithmIdentifier,
 		subjectPublicKey	BIT STRING	}
 */
-	if (getSequence(&p, (int)(end - p), &len) < 0) {
+	if (getSequence(&p, (int32)(end - p), &len) < 0) {
 		return -1;
 	}
-	if (getAlgorithmIdentifier(&p, (int)(end - p),
+	if (getAlgorithmIdentifier(&p, (int32)(end - p),
 			&cert->pubKeyAlgorithm, 1) < 0) {
 		return -1;
 	}
-	if (getPubKey(&p, (int)(end - p), &cert->publicKey) < 0) {
+	if (getPubKey(pool, &p, (int32)(end - p), &cert->publicKey) < 0) {
 		return -1;
 	}
 /*
 	As the next three values are optional, we can do a specific test here
 */
 	if (*p != (ASN_SEQUENCE | ASN_CONSTRUCTED)) {
-		if (getImplicitBitString(&p, (int)(end - p), IMPLICIT_ISSUER_ID,
+		if (getImplicitBitString(pool, &p, (int32)(end - p), IMPLICIT_ISSUER_ID,
 				&cert->uniqueUserId, &cert->uniqueUserIdLen) < 0 ||
-			getImplicitBitString(&p, (int)(end - p), IMPLICIT_SUBJECT_ID,
+			getImplicitBitString(pool, &p, (int32)(end - p), IMPLICIT_SUBJECT_ID,
 				&cert->uniqueSubjectId, &cert->uniqueSubjectIdLen) < 0 ||
-			getExplicitExtensions(&p, (int)(end - p), EXPLICIT_EXTENSION,
+			getExplicitExtensions(pool, &p, (int32)(end - p), EXPLICIT_EXTENSION,
 				&cert->extensions) < 0) {
 			return -1;
 		}
@@ -352,7 +357,7 @@ int matrixX509ParseCert(unsigned char **pp, int size, sslRsaCert_t **outcert)
 /*
 	Certificate signature info
 */
-	if (getAlgorithmIdentifier(&p, (int)(end - p),
+	if (getAlgorithmIdentifier(&p, (int32)(end - p),
 			&cert->sigAlgorithm, 0) < 0) {
 		return -1;
 	}
@@ -374,7 +379,7 @@ int matrixX509ParseCert(unsigned char **pp, int size, sslRsaCert_t **outcert)
 		matrixSha1Init(&sha1Ctx);
 		matrixSha1Update(&sha1Ctx, certStart, certLen);
 		matrixSha1Final(&sha1Ctx, cert->sigHash);
-	} 
+	}
 #ifdef USE_MD2
 	else if (cert->certAlgorithm == OID_RSA_MD2) {
 		matrixMd2Init(&md2Ctx);
@@ -383,7 +388,7 @@ int matrixX509ParseCert(unsigned char **pp, int size, sslRsaCert_t **outcert)
 	}
 #endif /* USE_MD2 */
 
-	if (getSignature(&p, (int)(end - p), &cert->signature,
+	if (getSignature(pool, &p, (int32)(end - p), &cert->signature,
 			&cert->signatureLen) < 0) {
 		return -1;
 	}
@@ -392,8 +397,7 @@ int matrixX509ParseCert(unsigned char **pp, int size, sslRsaCert_t **outcert)
 		matrixStrDebugMsg("Warning: Cert parse did not reach end of bufffer\n",
 			NULL);
 	}
-	*pp = p;
-	return 0;
+	return (int32)(p - pp);
 }
 
 /******************************************************************************/
@@ -457,12 +461,11 @@ void matrixX509FreeCert(sslRsaCert_t *cert)
 	Do the signature validation for a subject certificate against a
 	known CA certificate
 */
-int psAsnConfirmSignature(sslRsaCert_t *subjectCert, 
-						unsigned char *sigOut, int sigLen)
+int32 psAsnConfirmSignature(char *sigHash, unsigned char *sigOut, int32 sigLen)
 {
 	unsigned char	*end, *p = sigOut;
 	unsigned char	hash[SSL_SHA1_HASH_SIZE];
-	int				len, oi;
+	int32			len, oi;
 
 	end = p + sigLen;
 /*
@@ -474,18 +477,18 @@ int psAsnConfirmSignature(sslRsaCert_t *subjectCert,
 
 	Digest ::= OCTET STRING
 */
-	if (getSequence(&p, (int)(end - p), &len) < 0) {
+	if (getSequence(&p, (int32)(end - p), &len) < 0) {
 		return -1;
 	}
 
 /*
 	Could be MD5 or SHA1
  */
-	if (getAlgorithmIdentifier(&p, (int)(end - p), &oi, 0) < 0) {
+	if (getAlgorithmIdentifier(&p, (int32)(end - p), &oi, 0) < 0) {
 		return -1;
 	}
 	if ((*p++ != ASN_OCTET_STRING) ||
-			asnParseLength(&p, (int)(end - p), &len) < 0 || (end - p) <  len) {
+			asnParseLength(&p, (int32)(end - p), &len) < 0 || (end - p) <  len) {
 		return -1;
 	}
 	memcpy(hash, p, len);
@@ -503,7 +506,7 @@ int psAsnConfirmSignature(sslRsaCert_t *subjectCert,
 /*
 	hash should match sigHash
 */
-	if (memcmp(hash, subjectCert->sigHash, len) != 0) {
+	if (memcmp(hash, sigHash, len) != 0) {
 		return -1;
 	}
 	return 0;
@@ -516,12 +519,13 @@ int psAsnConfirmSignature(sslRsaCert_t *subjectCert,
 	country, organization, organizational-unit, distinguished name qualifier,
 	state or province name, and common name 
 */
-static int getDNAttributes(unsigned char **pp, int len, DNattributes_t *attribs)
+static int32 getDNAttributes(psPool_t *pool, unsigned char **pp, int32 len, 
+						   DNattributes_t *attribs)
 {
 	sslSha1Context_t	hash;
 	unsigned char		*p = *pp;
 	unsigned char		*dnEnd, *dnStart;
-	int					llen, setlen, arcLen, id, stringType;
+	int32				llen, setlen, arcLen, id, stringType;
 	char				*stringOut;
 
 	dnStart = p;
@@ -532,14 +536,14 @@ static int getDNAttributes(unsigned char **pp, int len, DNattributes_t *attribs)
 
 	matrixSha1Init(&hash);
 	while (p < dnEnd) {
-		if (getSet(&p, (int)(dnEnd - p), &setlen) < 0) {
+		if (getSet(&p, (int32)(dnEnd - p), &setlen) < 0) {
 			return -1;
 		}
-		if (getSequence(&p, (int)(dnEnd - p), &llen) < 0) {
+		if (getSequence(&p, (int32)(dnEnd - p), &llen) < 0) {
 			return -1;
 		}
 		if (dnEnd <= p || (*(p++) != ASN_OID) ||
-				asnParseLength(&p, (int)(dnEnd - p), &arcLen) < 0 || 
+				asnParseLength(&p, (int32)(dnEnd - p), &arcLen) < 0 || 
 				(dnEnd - p) < arcLen) {
 			return -1;
 		}
@@ -571,7 +575,7 @@ static int getDNAttributes(unsigned char **pp, int len, DNattributes_t *attribs)
 				return -1;
 			}
 			p += arcLen + 1;
-			if (asnParseLength(&p, (int)(dnEnd - p), &llen) < 0 || 
+			if (asnParseLength(&p, (int32)(dnEnd - p), &llen) < 0 || 
 					dnEnd - p < llen) {
 				return -1;
 			}
@@ -584,13 +588,13 @@ static int getDNAttributes(unsigned char **pp, int len, DNattributes_t *attribs)
 		if (arcLen != 3 || dnEnd - p < 2) {
 			return -1;
 		}
-		id = (int)*p++;
+		id = (int32)*p++;
 /*
 		Done with OID parsing
 */
-		stringType = (int)*p++;
+		stringType = (int32)*p++;
 
-		asnParseLength(&p, (int)(dnEnd - p), &llen);
+		asnParseLength(&p, (int32)(dnEnd - p), &llen);
 		if (dnEnd - p < llen) {
 			return -1;
 		}
@@ -598,7 +602,10 @@ static int getDNAttributes(unsigned char **pp, int len, DNattributes_t *attribs)
 			case ASN_PRINTABLESTRING:
 			case ASN_UTF8STRING:
 			case ASN_T61STRING:
-				stringOut = psMalloc(llen + 1);
+				stringOut = psMalloc(pool, llen + 1);
+				if (stringOut == NULL) {
+					return -8; /* SSL_MEM_ERROR */
+				}
 				memcpy(stringOut, p, llen);
 				stringOut[llen] = '\0';
 				p = p + llen;
@@ -668,12 +675,13 @@ static int getDNAttributes(unsigned char **pp, int len, DNattributes_t *attribs)
 /*
 	X509v3 extensions
 */
-static int getExplicitExtensions(unsigned char **pp, int inlen, int expVal,
+static int32 getExplicitExtensions(psPool_t *pool, unsigned char **pp, 
+								 int32 inlen, int32 expVal,
 								 v3extensions_t *extensions)
 {
 	unsigned char	*p = *pp, *end;
 	unsigned char	*extEnd;
-	int				len, oid, tmpLen, critical;
+	int32			len, oid, tmpLen, critical;
 
 	end = p + inlen;
 	if (inlen < 1) {
@@ -686,7 +694,7 @@ static int getExplicitExtensions(unsigned char **pp, int inlen, int expVal,
 		return 0;
 	}
 	p++;
-	if (asnParseLength(&p, (int)(end - p), &len) < 0 || (end - p) < len) {
+	if (asnParseLength(&p, (int32)(end - p), &len) < 0 || (end - p) < len) {
 		return -1;
 	}
 /*
@@ -696,12 +704,12 @@ static int getExplicitExtensions(unsigned char **pp, int inlen, int expVal,
 		extnID		OBJECT IDENTIFIER,
 		extnValue	OCTET STRING	}
 */
-	if (getSequence(&p, (int)(end - p), &len) < 0) {
+	if (getSequence(&p, (int32)(end - p), &len) < 0) {
 		return -1;
 	}
 	extEnd = p + len;
 	while ((p != extEnd) && *p == (ASN_SEQUENCE | ASN_CONSTRUCTED)) {
-		if (getSequence(&p, (int)(extEnd - p), &len) < 0) {
+		if (getSequence(&p, (int32)(extEnd - p), &len) < 0) {
 			return -1;
 		}
 /*
@@ -718,12 +726,12 @@ static int getExplicitExtensions(unsigned char **pp, int inlen, int expVal,
 			return -1;
 		}
 		oid = 0;
-		if (asnParseLength(&p, (int)(extEnd - p), &len) < 0 || 
+		if (asnParseLength(&p, (int32)(extEnd - p), &len) < 0 || 
 				(extEnd - p) < len) {
 			return -1;
 		}
 		while (len-- > 0) {
-			oid += (int)*p++;
+			oid += (int32)*p++;
 		}
 /*
 		Possible boolean value here for 'critical' id.  It's a failure if a
@@ -741,7 +749,7 @@ static int getExplicitExtensions(unsigned char **pp, int inlen, int expVal,
 			}
 		}
 		if (extEnd - p < 1 || (*p++ != ASN_OCTET_STRING) ||
-				asnParseLength(&p, (int)(extEnd - p), &len) < 0 || 
+				asnParseLength(&p, (int32)(extEnd - p), &len) < 0 || 
 				extEnd - p < len) {
 			matrixStrDebugMsg("Expecting OCTET STRING in ext parse\n", NULL);
 			return -1;
@@ -754,7 +762,7 @@ static int getExplicitExtensions(unsigned char **pp, int inlen, int expVal,
 				pathLenConstraint		INTEGER (0..MAX) OPTIONAL }
 */
 			case EXT_BASIC_CONSTRAINTS:
-				if (getSequence(&p, (int)(extEnd - p), &len) < 0) {
+				if (getSequence(&p, (int32)(extEnd - p), &len) < 0) {
 					return -1;
 				}
 /*
@@ -784,7 +792,7 @@ static int getExplicitExtensions(unsigned char **pp, int inlen, int expVal,
 				the cert path
 */
 				if (*p == ASN_INTEGER) {
-					if (getInteger(&p, (int)(extEnd - p),
+					if (getInteger(&p, (int32)(extEnd - p),
 							&(extensions->bc.pathLenConstraint)) < 0) {
 						return -1;
 					}
@@ -793,7 +801,7 @@ static int getExplicitExtensions(unsigned char **pp, int inlen, int expVal,
 				}
 				break;
 			case EXT_ALT_SUBJECT_NAME:
-				if (getSequence(&p, (int)(extEnd - p), &len) < 0) {
+				if (getSequence(&p, (int32)(extEnd - p), &len) < 0) {
 					return -1;
 				}
 /*
@@ -819,7 +827,10 @@ static int getExplicitExtensions(unsigned char **pp, int inlen, int expVal,
 						if (extEnd - p < tmpLen) {
 							return -1;
 						}
-						extensions->san.dns = psMalloc(tmpLen + 1);
+						extensions->san.dns = psMalloc(pool, tmpLen + 1);
+						if (extensions->san.dns == NULL) {
+							return -8; /* SSL_MEM_ERROR */
+						}
 						memset(extensions->san.dns, 0x0, tmpLen + 1);
 						memcpy(extensions->san.dns, p, tmpLen);
 					} else if (*p == (ASN_CONTEXT_SPECIFIC | ASN_PRIMITIVE | 6)) {
@@ -828,7 +839,10 @@ static int getExplicitExtensions(unsigned char **pp, int inlen, int expVal,
 						if (extEnd - p < tmpLen) {
 							return -1;
 						}
-						extensions->san.uri = psMalloc(tmpLen + 1);
+						extensions->san.uri = psMalloc(pool, tmpLen + 1);
+						if (extensions->san.uri == NULL) {
+							return -8; /* SSL_MEM_ERROR */
+						}
 						memset(extensions->san.uri, 0x0, tmpLen + 1);
 						memcpy(extensions->san.uri, p, tmpLen);
 					} else if (*p == (ASN_CONTEXT_SPECIFIC | ASN_PRIMITIVE | 1)) {
@@ -837,7 +851,10 @@ static int getExplicitExtensions(unsigned char **pp, int inlen, int expVal,
 						if (extEnd - p < tmpLen) {
 							return -1;
 						}
-						extensions->san.email = psMalloc(tmpLen + 1);
+						extensions->san.email = psMalloc(pool, tmpLen + 1);
+						if (extensions->san.email == NULL) {
+							return -8; /* SSL_MEM_ERROR */
+						}
 						memset(extensions->san.email, 0x0, tmpLen + 1);
 						memcpy(extensions->san.email, p, tmpLen);
 					} else {
@@ -863,7 +880,7 @@ static int getExplicitExtensions(unsigned char **pp, int inlen, int expVal,
 
 				KeyIdentifier ::= OCTET STRING
 */
-				if (getSequence(&p, (int)(extEnd - p), &len) < 0 || len < 1) {
+				if (getSequence(&p, (int32)(extEnd - p), &len) < 0 || len < 1) {
 					return -1;
 				}
 /*
@@ -871,18 +888,21 @@ static int getExplicitExtensions(unsigned char **pp, int inlen, int expVal,
 */
 				if (*p == (ASN_CONTEXT_SPECIFIC | ASN_PRIMITIVE | 0)) {
 					p++;
-					if (asnParseLength(&p, (int)(extEnd - p), 
+					if (asnParseLength(&p, (int32)(extEnd - p), 
 							&extensions->ak.keyLen) < 0 ||
 							extEnd - p < extensions->ak.keyLen) {
 						return -1;
 					}
-					extensions->ak.keyId = psMalloc(extensions->ak.keyLen);
+					extensions->ak.keyId = psMalloc(pool, extensions->ak.keyLen);
+					if (extensions->ak.keyId == NULL) {
+						return -8; /* SSL_MEM_ERROR */
+					}
 					memcpy(extensions->ak.keyId, p, extensions->ak.keyLen);
 					p = p + extensions->ak.keyLen;
 				}
 				if (*p == (ASN_CONTEXT_SPECIFIC | ASN_CONSTRUCTED | 1)) {
 					p++;
-					if (asnParseLength(&p, (int)(extEnd - p), &len) < 0 ||
+					if (asnParseLength(&p, (int32)(extEnd - p), &len) < 0 ||
 							len < 1 || extEnd - p < len) {
 						return -1;
 					}
@@ -896,11 +916,11 @@ static int getExplicitExtensions(unsigned char **pp, int inlen, int expVal,
 						return -1;
 					}
 					p++;
-					if (asnParseLength(&p, (int)(extEnd - p), &len) < 0 || 
+					if (asnParseLength(&p, (int32)(extEnd - p), &len) < 0 || 
 							extEnd - p < len) {
 						return -1;
 					}
-					if (getDNAttributes(&p, (int)(extEnd - p),
+					if (getDNAttributes(pool, &p, (int32)(extEnd - p),
 							&(extensions->ak.attribs)) < 0) {
 						return -1;
 					}
@@ -910,7 +930,7 @@ static int getExplicitExtensions(unsigned char **pp, int inlen, int expVal,
 					Standard getInteger doesn't like CONTEXT_SPECIFIC tag
 */
 					*p &= ASN_INTEGER;
-					if (getInteger(&p, (int)(extEnd - p), 
+					if (getInteger(&p, (int32)(extEnd - p), 
 							&(extensions->ak.serialNum)) < 0) {
 						return -1;
 					}
@@ -934,7 +954,7 @@ static int getExplicitExtensions(unsigned char **pp, int inlen, int expVal,
 				if (*p++ != ASN_BIT_STRING) {
 					return -1;
 				}
-				if (asnParseLength(&p, (int)(extEnd - p), &len) < 0 || 
+				if (asnParseLength(&p, (int32)(extEnd - p), &len) < 0 || 
 						extEnd - p < len) {
 					return -1;
 				}
@@ -955,11 +975,14 @@ static int getExplicitExtensions(unsigned char **pp, int inlen, int expVal,
 				this certificate.
 */
 				if (*p++ != ASN_OCTET_STRING || asnParseLength(&p,
-						(int)(extEnd - p), &(extensions->sk.len)) < 0 ||
+						(int32)(extEnd - p), &(extensions->sk.len)) < 0 ||
 						extEnd - p < extensions->sk.len) {
 					return -1;
 				}
-				extensions->sk.id = psMalloc(extensions->sk.len);
+				extensions->sk.id = psMalloc(pool, extensions->sk.len);
+				if (extensions->sk.id == NULL) {
+					return -8; /* SSL_MEM_ERROR */
+				}
 				memcpy(extensions->sk.id, p, extensions->sk.len);
 				p = p + extensions->sk.len;
 				break;
@@ -974,7 +997,7 @@ static int getExplicitExtensions(unsigned char **pp, int inlen, int expVal,
 					return -1;
 				}
 				p++;
-				if (asnParseLength(&p, (int)(extEnd - p), &len) < 0 ||
+				if (asnParseLength(&p, (int32)(extEnd - p), &len) < 0 ||
 						extEnd - p < len) {
 					return -1;
 				}
@@ -995,10 +1018,10 @@ static int getExplicitExtensions(unsigned char **pp, int inlen, int expVal,
 		0			Success
 		< 0			Error
 */
-static int asnParseLength(unsigned char **p, int size, int *valLen)
+static int32 asnParseLength(unsigned char **p, int32 size, int32 *valLen)
 {
 	unsigned char	*c, *end;
-	int				len, olen;
+	int32			len, olen;
 
 	c = *p;
 	end = c + size;
@@ -1025,7 +1048,7 @@ static int asnParseLength(unsigned char **p, int size, int *valLen)
 		Make sure there aren't more than 4 bytes of length specifier,
 		and that we have that many bytes left in the buffer
 */
-		if (len > sizeof(int) || len == 0x7f || (end - c) < len) {
+		if (len > sizeof(int32) || len == 0x7f || (end - c) < len) {
 			return -1;
 		}
 		olen = 0;
@@ -1045,19 +1068,19 @@ static int asnParseLength(unsigned char **p, int size, int *valLen)
 
 /******************************************************************************/
 /*
-	Callback to extract a big int (stream of bytes) from the DER stream
+	Callback to extract a big int32 (stream of bytes) from the DER stream
 */
-static int getBig(unsigned char **pp, int len, mp_int *big)
+static int32 getBig(psPool_t *pool, unsigned char **pp, int32 len, mp_int *big)
 {
 	unsigned char	*p = *pp;
-	int				vlen;
+	int32			vlen;
 
 	if (len < 1 || *(p++) != ASN_INTEGER ||
 			asnParseLength(&p, len - 1, &vlen) < 0) {
 		matrixStrDebugMsg("ASN getBig failed\n", NULL);
 		return -1;
 	}
-	mp_init(big);
+	mp_init(pool, big);
 	if (mp_read_unsigned_bin(big, p, vlen) != 0) {
 		mp_clear(big);
 		matrixStrDebugMsg("ASN getBig failed\n", NULL);
@@ -1074,11 +1097,11 @@ static int getBig(unsigned char **pp, int len, mp_int *big)
 	doesn't prevent it from being abused as containing a variable length
 	binary value.  Get it here.
 */	
-static int getSerialNum(unsigned char **pp, int len, unsigned char **sn,
-						int *snLen)
+static int32 getSerialNum(psPool_t *pool, unsigned char **pp, int32 len, 
+						unsigned char **sn, int32 *snLen)
 {
 	unsigned char	*p = *pp;
-	int				vlen;
+	int32			vlen;
 
 	if (len < 1 || *(p++) != ASN_INTEGER ||
 			asnParseLength(&p, len - 1, &vlen) < 0) {
@@ -1086,7 +1109,10 @@ static int getSerialNum(unsigned char **pp, int len, unsigned char **sn,
 		return -1;
 	}
 	*snLen = vlen;
-	*sn = psMalloc(vlen);
+	*sn = psMalloc(pool, vlen);
+	if (*sn == NULL) {
+		return -8; /* SSL_MEM_ERROR */
+	}
 	memcpy(*sn, p, vlen);
 	p += vlen;
 	*pp = p;
@@ -1099,7 +1125,7 @@ static int getSerialNum(unsigned char **pp, int len, unsigned char **sn,
 	Verifies that 'len' bytes are >= 'seqlen'
 	Move pp to the first character in the sequence
 */
-static int getSequence(unsigned char **pp, int len, int *seqlen)
+static int32 getSequence(unsigned char **pp, int32 len, int32 *seqlen)
 {
 	unsigned char	*p = *pp;
 
@@ -1115,7 +1141,7 @@ static int getSequence(unsigned char **pp, int len, int *seqlen)
 /*
 	Extract a set length from the DER stream
 */
-static int getSet(unsigned char **pp, int len, int *setlen)
+static int32 getSet(unsigned char **pp, int32 len, int32 *setlen)
 {
 	unsigned char	*p = *pp;
 
@@ -1131,10 +1157,10 @@ static int getSet(unsigned char **pp, int len, int *setlen)
 /*
 	Explicit value encoding has an additional tag layer
 */
-static int getExplicitVersion(unsigned char **pp, int len, int expVal, int *val)
+static int32 getExplicitVersion(unsigned char **pp, int32 len, int32 expVal, int32 *val)
 {
 	unsigned char	*p = *pp;
-	int				exLen;
+	int32			exLen;
 
 	if (len < 1) {
 		return -1;
@@ -1162,11 +1188,11 @@ static int getExplicitVersion(unsigned char **pp, int len, int expVal, int *val)
 /*
 	Implementation specific OID parser for suppported RSA algorithms
 */
-static int getAlgorithmIdentifier(unsigned char **pp, int len, int *oi,
-								  int isPubKey)
+static int32 getAlgorithmIdentifier(unsigned char **pp, int32 len, int32 *oi,
+								  int32 isPubKey)
 {
 	unsigned char	*p = *pp, *end;
-	int				arcLen, llen;
+	int32			arcLen, llen;
 
 	end = p + len;
 	if (len < 1 || getSequence(&p, len, &llen) < 0) {
@@ -1175,7 +1201,7 @@ static int getAlgorithmIdentifier(unsigned char **pp, int len, int *oi,
 	if (end - p < 1) {
 		return -1;
 	}
-	if (*(p++) != ASN_OID || asnParseLength(&p, (int)(end - p), &arcLen) < 0 ||
+	if (*(p++) != ASN_OID || asnParseLength(&p, (int32)(end - p), &arcLen) < 0 ||
 			llen < arcLen) {
 		return -1;
 	}
@@ -1205,15 +1231,16 @@ static int getAlgorithmIdentifier(unsigned char **pp, int len, int *oi,
 	}
 	*oi = 0;
 	while (arcLen-- > 0) {
-		*oi += (int)*p++;
+		*oi += (int32)*p++;
 	}
 /*
-	Each of these cases should have a trailing NULL parameter.  Skip it
+	Each of these cases might have a trailing NULL parameter.  Skip it
 */
-	if (end - p < 2) {
-		return -1;
-	}
 	if (*p != ASN_NULL) {
+		*pp = p;
+		return 0;
+	}
+	if (end - p < 2) {
 		return -1;
 	}
 	*pp = p + 2;
@@ -1225,11 +1252,11 @@ static int getAlgorithmIdentifier(unsigned char **pp, int len, int *oi,
 	Implementation specific date parser.
 	Does not actually verify the date
 */
-static int getValidity(unsigned char **pp, int len,
+static int32 getValidity(psPool_t *pool, unsigned char **pp, int32 len,
 					   char **notBefore, char **notAfter)
 {
 	unsigned char	*p = *pp, *end;
-	int				seqLen, timeLen;
+	int32			seqLen, timeLen;
 
 	end = p + len;
 	if (len < 1 || *(p++) != (ASN_SEQUENCE | ASN_CONSTRUCTED) || 
@@ -1249,7 +1276,10 @@ static int getValidity(unsigned char **pp, int len,
 	if (asnParseLength(&p, seqLen, &timeLen) < 0 || (end - p) < timeLen) {
 		return -1;
 	}
-	*notBefore = psMalloc(timeLen + 1);
+	*notBefore = psMalloc(pool, timeLen + 1);
+	if (*notBefore == NULL) {
+		return -8; /* SSL_MEM_ERROR */
+	}
 	memcpy(*notBefore, p, timeLen);
 	(*notBefore)[timeLen] = '\0';
 	p = p + timeLen;
@@ -1261,7 +1291,10 @@ static int getValidity(unsigned char **pp, int len,
 			(end - p) < timeLen) {
 		return -1;
 	}
-	*notAfter = psMalloc(timeLen + 1);
+	*notAfter = psMalloc(pool, timeLen + 1);
+	if (*notAfter == NULL) {
+		return -8; /* SSL_MEM_ERROR */
+	}
 	memcpy(*notAfter, p, timeLen);
 	(*notAfter)[timeLen] = '\0';
 	p = p + timeLen;
@@ -1274,10 +1307,11 @@ static int getValidity(unsigned char **pp, int len,
 /*
 	Get the BIT STRING key and plug into RSA structure
 */
-static int getPubKey(unsigned char **pp, int len, sslRsaKey_t *pubKey)
+static int32 getPubKey(psPool_t *pool, unsigned char **pp, int32 len, 
+					 sslRsaKey_t *pubKey)
 {
 	unsigned char	*p = *pp;
-	int				pubKeyLen, ignore_bits, seqLen;
+	int32			pubKeyLen, ignore_bits, seqLen;
 
 	if (len < 1 || (*(p++) != ASN_BIT_STRING) ||
 			asnParseLength(&p, len - 1, &pubKeyLen) < 0 || 
@@ -1292,8 +1326,8 @@ static int getPubKey(unsigned char **pp, int len, sslRsaKey_t *pubKey)
 	sslAssert(ignore_bits == 0);
 
 	if (getSequence(&p, pubKeyLen, &seqLen) < 0 ||
-			getBig(&p, seqLen, &pubKey->N) < 0 ||
-			getBig(&p, seqLen, &pubKey->e) < 0) {
+			getBig(pool, &p, seqLen, &pubKey->N) < 0 ||
+			getBig(pool, &p, seqLen, &pubKey->e) < 0) {
 		return -1;
 	}
 	pubKey->size = mp_unsigned_bin_size(&pubKey->N);
@@ -1306,11 +1340,11 @@ static int getPubKey(unsigned char **pp, int len, sslRsaKey_t *pubKey)
 /*
 	Currently just returning the raw BIT STRING and size in bytes
 */
-static int getSignature(unsigned char **pp, int len,
-						unsigned char **sig, int *sigLen)
+static int32 getSignature(psPool_t *pool, unsigned char **pp, int32 len,
+						unsigned char **sig, int32 *sigLen)
 {
 	unsigned char	*p = *pp, *end;
-	int				ignore_bits, llen;
+	int32			ignore_bits, llen;
 	
 	end = p + len;
 	if (len < 1 || (*(p++) != ASN_BIT_STRING) ||
@@ -1326,7 +1360,10 @@ static int getSignature(unsigned char **pp, int len,
 	Length included the ignore_bits byte
 */
 	*sigLen = llen - 1;
-	*sig = psMalloc(*sigLen);
+	*sig = psMalloc(pool, *sigLen);
+	if (*sig == NULL) {
+		return -8; /* SSL_MEM_ERROR */
+	}
 	memcpy(*sig, p, *sigLen);
 	*pp = p + *sigLen;
 	return 0;
@@ -1337,11 +1374,11 @@ static int getSignature(unsigned char **pp, int len,
 	Could be optional.  If the tag doesn't contain the value from the left
 	of the IMPLICIT keyword we don't have a match and we don't incr the pointer.
 */
-static int getImplicitBitString(unsigned char **pp, int len, int impVal,
-						unsigned char **bitString, int *bitLen)
+static int32 getImplicitBitString(psPool_t *pool, unsigned char **pp, int32 len, 
+						int32 impVal, unsigned char **bitString, int32 *bitLen)
 {
-	unsigned char *p = *pp;
-	int			ignore_bits;
+	unsigned char	*p = *pp;
+	int32			ignore_bits;
 
 	if (len < 1) {
 		return -1;
@@ -1360,7 +1397,10 @@ static int getImplicitBitString(unsigned char **pp, int len, int impVal,
 	ignore_bits = *p++;
 	sslAssert(ignore_bits == 0);
 
-	*bitString = psMalloc(*bitLen);
+	*bitString = psMalloc(pool, *bitLen);
+	if (*bitString == NULL) {
+		return -8; /* SSL_MEM_ERROR */
+	}
 	memcpy(*bitString, p, *bitLen);
 	*pp = p + *bitLen;
 	return 0;
@@ -1370,11 +1410,11 @@ static int getImplicitBitString(unsigned char **pp, int len, int impVal,
 /*
 	Get an integer
 */
-static int getInteger(unsigned char **pp, int len, int *val)
+static int32 getInteger(unsigned char **pp, int32 len, int32 *val)
 {
 	unsigned char	*p = *pp, *end;
-	unsigned int	ui;
-	int				vlen;
+	uint32			ui;
+	int32			vlen;
 
 	end = p + len;
 	if (len < 1 || *(p++) != ASN_INTEGER ||
@@ -1387,7 +1427,7 @@ static int getInteger(unsigned char **pp, int len, int *val)
 	high bit is set because it will be encoded as 5 bytes (with leading 
 	blank byte).  If that is required, a getUnsigned routine should be used
 */
-	if (vlen > sizeof(int) || end - p < vlen) {
+	if (vlen > sizeof(int32) || end - p < vlen) {
 		matrixStrDebugMsg("ASN getInteger failed\n", NULL);
 		return -1;
 	}
@@ -1401,7 +1441,7 @@ static int getInteger(unsigned char **pp, int len, int *val)
 			ui = (ui << 8) | (*p ^ 0xFF);
 			p++;
 		}
-		vlen = (int)ui;
+		vlen = (int32)ui;
 		vlen++;
 		vlen = -vlen;
 		*val = vlen;
@@ -1410,7 +1450,7 @@ static int getInteger(unsigned char **pp, int len, int *val)
 			ui = (ui << 8) | *p;
 			p++;
 		}
-		*val = (int)ui;
+		*val = (int32)ui;
 	}
 	*pp = p;
 	return 0;

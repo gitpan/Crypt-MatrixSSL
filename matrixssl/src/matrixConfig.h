@@ -1,12 +1,12 @@
 /*
  *	matrixConfig.h
- *	Release $Name: MATRIXSSL_1_2_2_OPEN $
+ *	Release $Name: MATRIXSSL_1_2_4_OPEN $
  *
  *	Configuration settings for building the MatrixSSL library.
  *	These options affect the size and algorithms present in the library.
  */
 /*
- *	Copyright (c) PeerSec Networks, 2002-2004. All Rights Reserved.
+ *	Copyright (c) PeerSec Networks, 2002-2005. All Rights Reserved.
  *	The latest version of this code is available at http://www.matrixssl.org
  *
  *	This software is open source; you can redistribute it and/or modify
@@ -69,7 +69,6 @@ extern "C" {
 #define USE_CLIENT_SIDE_SSL
 #define USE_SERVER_SIDE_SSL
 
-
 /******************************************************************************/
 /*
 	Use native 64 bit integers (long longs)
@@ -91,74 +90,6 @@ extern "C" {
 */
 #define USE_FILE_SYSTEM
 
-/******************************************************************************/
-/*
-	Prevent certain timing attacks by randomizing RSA calculations.
-
-	http://crypto.stanford.edu/~dabo/papers/ssl-timing.pdf
-*/
-/* #define USE_RSA_BLINDING */
-
-/******************************************************************************/
-/*
-	Custom memory allocators can be defined here
-*/
-/* #define USE_PEERSEC_MALLOC */
-
-#ifdef USE_PEERSEC_MALLOC
-#include <stddef.h>
-
-#ifdef WINCE
-#include <windows.h>
-#endif /* WINCE */
-
-#define MAX_MEMORY_USAGE	1024 * 1024	/* FUTURE */
-extern int psOpenMalloc(int poolSize);
-extern void psCloseMalloc();
-extern void *psMalloc(size_t size);
-extern void psFree(void *ptr);
-extern void *psCalloc(size_t n, size_t size);
-extern void *psRealloc(void *ptr, size_t n);
-#define psMemset	memset
-#define psMemcpy	memcpy
-#else
-#define MAX_MEMORY_USAGE	0
-#define psOpenMalloc(A)
-#define psCloseMalloc()
-#define psMalloc	malloc
-#define psRealloc	realloc
-#define psCalloc	calloc
-#define psFree		free
-#define psMemset	memset
-#define psMemcpy	memcpy
-#endif
-
-
-/******************************************************************************/
-/*
-	Debugging functionality.  
-	
-	If DEBUG is defined matrixStrDebugMsg and matrixIntDebugMsg messages are
-	output to stdout, sslAsserts go to stderror and call psBreak.
-
-	In non-DEBUG builds matrixStrDebugMsg and matrixIntDebugMsg are 
-	compiled out.  sslAsserts still go to stderr, but psBreak is not called.
-
-*/
-
-#if DEBUG
-extern void	psBreak();
-extern void matrixStrDebugMsg(char *message, char *arg);
-extern void matrixIntDebugMsg(char *message, int arg);
-#define sslAssert(C)  if (C) ; else \
-	{fprintf(stderr, "%s:%d sslAssert(%s)\n",__FILE__, __LINE__, #C); psBreak(); }
-#else
-#define matrixStrDebugMsg(x, y)
-#define matrixIntDebugMsg(x, y)
-#define sslAssert(C)  if (C) ; else \
-	{fprintf(stderr, "%s:%d sslAssert(%s)\n",__FILE__, __LINE__, #C); }
-#endif
-
 #ifdef __cplusplus
 }
 #endif
@@ -166,6 +97,14 @@ extern void matrixIntDebugMsg(char *message, int arg);
 #endif /* _h_MATRIXCONFIG */
 
 /******************************************************************************/
+
+
+
+
+
+
+
+
 
 
 

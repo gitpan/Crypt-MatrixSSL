@@ -1,11 +1,11 @@
 /*
  *	win.c
- *	Release $Name: MATRIXSSL_1_2_2_OPEN $
+ *	Release $Name: MATRIXSSL_1_2_4_OPEN $
  *
  *	Microsoft Windows compatibility layer.
  */
 /*
- *	Copyright (c) PeerSec Networks, 2002-2004. All Rights Reserved.
+ *	Copyright (c) PeerSec Networks, 2002-2005. All Rights Reserved.
  *	The latest version of this code is available at http://www.matrixssl.org
  *
  *	This software is open source; you can redistribute it and/or modify
@@ -29,7 +29,7 @@
  */
  /******************************************************************************/
 
-#include "../../matrixInternal.h"
+#include "../osLayer.h"
 
 #include <windows.h>
 #include <wincrypt.h>
@@ -54,9 +54,13 @@ static LARGE_INTEGER	hiresFreq; /* tics per second */
 
 static HCRYPTPROV		hProv;	/* Crypto context for random bytes */
 
-int sslOpenOsdep()
+int32 sslOpenOsdep()
 {
-	psOpenMalloc(MAX_MEMORY_USAGE);
+	int32		rc;
+
+	if ((rc = psOpenMalloc(MAX_MEMORY_USAGE)) < 0) {
+		return rc;
+	}
 /*
 	Hires time init
 */
@@ -70,14 +74,14 @@ int sslOpenOsdep()
 	return 0;
 }
 
-int sslCloseOsdep()
+int32 sslCloseOsdep()
 {
 	CryptReleaseContext(hProv, 0);
 	psCloseMalloc();
 	return 0;
 }
 
-int sslGetEntropy(unsigned char *bytes, int size)
+int32 sslGetEntropy(unsigned char *bytes, int32 size)
 {
 	if (CryptGenRandom(hProv, size, bytes)) {
 		return size;
@@ -88,35 +92,35 @@ int sslGetEntropy(unsigned char *bytes, int size)
 #ifdef DEBUG
 void psBreak()
 {
-	int	i = 0; i++;	/* Prevent the compiler optimizing this function away */
+	int32	i = 0; i++;	/* Prevent the compiler optimizing this function away */
 
 	DebugBreak();
 }
 #endif
 
-int sslInitMsecs(sslTime_t *t)
+int32 sslInitMsecs(sslTime_t *t)
 {
 	__int64		diff;
-	int			d;
+	int32			d;
 
 	QueryPerformanceCounter(t);
 	diff = t->QuadPart - hiresStart.QuadPart;
-	d = (int)((diff * 1000) / hiresFreq.QuadPart);
+	d = (int32)((diff * 1000) / hiresFreq.QuadPart);
 	return d;
 }
 
-int sslDiffSecs(sslTime_t then, sslTime_t now)
+int32 sslDiffSecs(sslTime_t then, sslTime_t now)
 {
 	__int64	diff;
 
 	diff = now.QuadPart - then.QuadPart;
-	return (int)(diff / hiresFreq.QuadPart);
+	return (int32)(diff / hiresFreq.QuadPart);
 }
 
 /*
 	Time comparison.  1 if 'a' is less than or equal.  0 if 'a' is greater
 */
-int sslCompareTime(sslTime_t a, sslTime_t b)
+int32 sslCompareTime(sslTime_t a, sslTime_t b)
 {
 	if (a.QuadPart <= b.QuadPart) {
 		return 1;
@@ -132,11 +136,11 @@ int sslCompareTime(sslTime_t a, sslTime_t b)
  	NOTES:
  		only gets the file size currently
  */
-int stat(char *filename, struct stat *sbuf)
+int32 stat(char *filename, struct stat *sbuf)
 {
 	DWORD	dwAttributes;
 	HANDLE	hFile;
-	int		rc, size;
+	int32		rc, size;
 
 	unsigned short uniFile[512];
 
@@ -226,7 +230,7 @@ time_t time() {
 	we divide by 10000 to get seconds.
  */
 	iTimeDiff = (time2 - time1) / 10000000;
-	return (int)iTimeDiff;
+	return (int32)iTimeDiff;
 }
 #endif /* WINCE */
 

@@ -1,11 +1,11 @@
 /*
  *	socketLayer.c
- *	Release $Name: MATRIXSSL_1_2_2_OPEN $
+ *	Release $Name: MATRIXSSL_1_2_4_OPEN $
  *
  *	Sample SSL socket layer for MatrixSSL example exectuables
  */
 /*
- *	Copyright (c) PeerSec Networks, 2002-2004. All Rights Reserved.
+ *	Copyright (c) PeerSec Networks, 2002-2005. All Rights Reserved.
  *	The latest version of this code is available at http://www.matrixssl.org
  *
  *	This software is open source; you can redistribute it and/or modify
@@ -32,8 +32,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "sslSocket.h"
-
-static int socketWrite(SOCKET sock, sslBuf_t *out);
 
 /******************************************************************************/
 /*
@@ -181,6 +179,9 @@ int sslAccept(sslConn_t **cpp, SOCKET fd, sslKeys_t *keys,
 		sslFreeConnection(&conn);
 		return -1;
 	}
+	if (flags & SSL_FLAGS_CLIENT_AUTH) {
+		matrixSslSetCertValidator(conn->ssl, certValidator, NULL);
+	}
 /*
 	MatrixSSL doesn't provide buffers for data internally.  Define them
 	here to support buffered reading and writing for non-blocking sockets.
@@ -258,9 +259,10 @@ int sslConnect(sslConn_t **cpp, SOCKET fd, sslKeys_t *keys,
 	return 0;
 }
 
+/******************************************************************************/
 /*
 	Construct the initial HELLO message to send to the server and initiate
-	the SSL handshake
+	the SSL handshake.  Can be used in the re-handshake scenario as well.
 */
 sslConn_t *sslDoHandshake(sslConn_t *conn, short cipherSuite)
 {
@@ -291,7 +293,7 @@ sslConn_t *sslDoHandshake(sslConn_t *conn, short cipherSuite)
 /*
 	Send the hello with a blocking write
 */
-	if (socketWrite(conn->fd, &conn->outsock) < 0) {
+	if (psSocketWrite(conn->fd, &conn->outsock) < 0) {
 		fprintf(stdout, "Error in socketWrite\n");
 		goto error;
 	}
@@ -315,8 +317,8 @@ readMore:
 			goto readMore;
 		}
 	} else if (rc > 0) {
-		fprintf(stderr, "sslRead got unexpected data in sslConnect\n");
-		goto error;
+		fprintf(stderr, "sslRead got %d data in sslDoHandshake %s\n", rc, buf);
+		goto readMore;
 	} else {
 		fprintf(stderr, "sslRead error in sslDoHandhake\n");
 		goto error;
@@ -681,7 +683,7 @@ void sslWriteClosureAlert(sslConn_t *cp)
 void sslRehandshake(sslConn_t *cp)
 {
 	matrixSslEncodeHelloRequest(cp->ssl, &cp->outsock);
-	socketWrite(cp->fd, &cp->outsock);
+	psSocketWrite(cp->fd, &cp->outsock);
 	cp->outsock.start = cp->outsock.end = cp->outsock.buf;
 }
 
@@ -758,7 +760,7 @@ void socketShutdown(SOCKET sock)
 /*
 	Perform a blocking write of data to a socket
 */
-static int socketWrite(SOCKET sock, sslBuf_t *out)
+int psSocketWrite(SOCKET sock, sslBuf_t *out)
 {
 	unsigned char	*s;
 	int				bytes;
@@ -772,6 +774,28 @@ static int socketWrite(SOCKET sock, sslBuf_t *out)
 		out->start += bytes;
 	}
 	return (int)(out->start - s);
+}
+
+int psSocketRead(SOCKET sock, sslBuf_t **out, int *status)
+{
+	sslBuf_t	*local;
+	char		*c;
+	int			bytes;
+
+	local = *out;
+	c = local->start;
+
+	bytes = recv(sock, c, (int)((local->buf + local->size) - local->end), MSG_NOSIGNAL);
+	if (bytes == SOCKET_ERROR) {
+		*status = getSocketError();
+		return -1;
+	}
+	if (bytes == 0) {
+		*status = SSLSOCKET_EOF;
+		return 0;
+	}
+	local->end += bytes;
+	return bytes;
 }
 
 /******************************************************************************/
@@ -837,7 +861,6 @@ void breakpoint()
 }
 
 
-
 /******************************************************************************/
 /*
  	Parse an ASCII command line string.  Assumes a NULL terminated space 
@@ -876,7 +899,7 @@ void parseCmdLineArgs(char *args, int *pargc, char ***pargv)
 		}
 	}
 /*
- *	This is called from main, so don't use sslMalloc here or
+ *	This is called from main, so don't use psMalloc here or
  *	all the stats will be wrong.
  */
 	argv = (char**) malloc(size * sizeof(char*));
@@ -992,6 +1015,8 @@ time_t time() {
 #endif /* WINCE */
 
 /******************************************************************************/
+
+
 
 
 

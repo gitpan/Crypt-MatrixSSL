@@ -177,10 +177,10 @@ del &quot;$(OutDir)\libmatrixssl.lib&quot;
 				Name="os"
 				Filter="">
 				<File
-					RelativePath="os\malloc.c">
+					RelativePath="os\osLayer.h">
 				</File>
 				<File
-					RelativePath="os\osLayer.h">
+					RelativePath="os\psMalloc.h">
 				</File>
 				<Filter
 					Name="linux"

@@ -1,11 +1,11 @@
 /*
  *	matrixSsl.c
- *	Release $Name: MATRIXSSL_1_2_2_OPEN $
+ *	Release $Name: MATRIXSSL_1_2_4_OPEN $
  *
  *	Secure Sockets Layer session management
  */
 /*
- *	Copyright (c) PeerSec Networks, 2002-2004. All Rights Reserved.
+ *	Copyright (c) PeerSec Networks, 2002-2005. All Rights Reserved.
  *	The latest version of this code is available at http://www.matrixssl.org
  *
  *	This software is open source; you can redistribute it and/or modify
@@ -37,8 +37,10 @@
 
 /******************************************************************************/
 
-static int parseList(char *list, char *sep, char **item);
-static int readCertChain(char *certFiles, sslKeys_t *lkeys);
+static int32 parseList(char *list, const char *sep, char **item);
+static int32 readCertChain(char *certFiles, sslKeys_t *lkeys);
+
+static char copyright[]= "Copyright PeerSec Networks Inc. All rights reserved.";
 
 #ifdef USE_SERVER_SIDE_SSL
 /*
@@ -54,12 +56,13 @@ static sslSessionEntry_t	sessionTable[SSL_SESSION_TABLE_SIZE];
 	lifetime of the application and initialize and clean up the library 
 	respectively.
 */
-int matrixSslOpen()
+int32 matrixSslOpen()
 {
 	if (sslOpenOsdep() < 0) {
 		matrixStrDebugMsg("Osdep open failure\n", NULL);
 		return -1;
 	}
+
 #ifdef USE_SERVER_SIDE_SSL
 	memset(sessionTable, 0x0, 
 		sizeof(sslSessionEntry_t) * SSL_SESSION_TABLE_SIZE);
@@ -72,7 +75,7 @@ int matrixSslOpen()
 void matrixSslClose()
 {
 #ifdef USE_SERVER_SIDE_SSL
-	int		i;
+	int32		i;
 
 	sslLockMutex(&sessionTableLock);
 	for (i = 0; i < SSL_SESSION_TABLE_SIZE; i++) {
@@ -98,20 +101,23 @@ void matrixSslClose()
 	The private key is stored in a crypto provider specific structure
 */
 #ifdef USE_FILE_SYSTEM
-int matrixSslReadKeys(sslKeys_t **keys, char *certFile, char *privFile,
+int32 matrixSslReadKeys(sslKeys_t **keys, char *certFile, char *privFile,
 					  char *privPass, char *trustedCAFiles)
 {
 	sslKeys_t		*lkeys;
-	int				rc;
+	int32			rc;
 #ifdef USE_CLIENT_SIDE_SSL
 	sslRsaCert_t	*currCert, *prevCert = NULL;
-	char			sep[] = ";";
-	unsigned char	*caCert, *tmp;
+	const char		sep[] = ";";
+	unsigned char	*caCert;
 	char			*caFile, *origList;
-	int				caCertLen, i;
+	int32			caCertLen, i;
 #endif /* USE_CLIENT_SIDE_SSL */
 
-	*keys = lkeys = psMalloc(sizeof(sslKeys_t));
+	*keys = lkeys = psMalloc(NULL, sizeof(sslKeys_t));
+	if (lkeys == NULL) {
+		return SSL_MEM_ERROR;
+	}
 	memset(lkeys, 0x0, sizeof(sslKeys_t));
 /*
 	Load certificate files.  Any additional certificate files should chain
@@ -153,14 +159,13 @@ int matrixSslReadKeys(sslKeys_t **keys, char *certFile, char *privFile,
 			continue;
 		}
 		psFree(caFile);
-		tmp = caCert;
-		if (matrixX509ParseCert(&caCert, caCertLen, &currCert) < 0) {
+		if (matrixX509ParseCert(NULL, caCert, caCertLen, &currCert) < 0) {
 			matrixStrDebugMsg("Error parsing CA cert %s\n", caFile);
-			psFree(tmp);
+			psFree(caCert);
 			trustedCAFiles += parseList(trustedCAFiles, sep, &caFile);
 			continue;
 		}
-		psFree(tmp);
+		psFree(caCert);
 		if (i++ == 0) {
 			lkeys->caCerts = currCert;
 		} else {
@@ -183,7 +188,7 @@ int matrixSslReadKeys(sslKeys_t **keys, char *certFile, char *privFile,
 	return 0; 
 }
 #else /* USE_FILE_SYSTEM */
-int matrixSslReadKeys(sslKeys_t **keys, char *certFile, char *privFile,
+int32 matrixSslReadKeys(sslKeys_t **keys, char *certFile, char *privFile,
 					 char *privPass, char *trustedCAFile)
 {
 	matrixStrDebugMsg("Error: Calling matrixSslReadKeys against a library " \
@@ -196,17 +201,20 @@ int matrixSslReadKeys(sslKeys_t **keys, char *certFile, char *privFile,
 /*
 	In memory version of matrixSslReadKeys.
 */
-int	matrixSslReadKeysMem(sslKeys_t **keys, char *certBuf, int certLen,
-			char *privBuf, int privLen, char *privPass, char *trustedCABuf,
-			int trustedCALen)
+int32	matrixSslReadKeysMem(sslKeys_t **keys, char *certBuf, int32 certLen,
+			char *privBuf, int32 privLen, char *privPass, char *trustedCABuf,
+			int32 trustedCALen)
 {
-	sslKeys_t	*lkeys;
+	sslKeys_t		*lkeys;
 #ifdef USE_CLIENT_SIDE_SSL
-	unsigned char	*caCert, *tmp;
-	int				caCertLen;
+	unsigned char	*caCert;
+	int32			caCertLen;
 #endif /* USE_CLIENT_SIDE_SSL */
 
-	*keys = lkeys = psMalloc(sizeof(sslKeys_t));
+	*keys = lkeys = psMalloc(NULL, sizeof(sslKeys_t));
+	if (lkeys == NULL) {
+		return SSL_MEM_ERROR;
+	}
 	memset(lkeys, 0x0, sizeof(sslKeys_t));
 /*
 	Certificate file to send
@@ -233,14 +241,12 @@ int	matrixSslReadKeysMem(sslKeys_t **keys, char *certBuf, int certLen,
 	if (caCert == NULL) {
 		return 0;
 	}
-	tmp = caCert;
-	if (matrixX509ParseCert(&caCert, caCertLen, &lkeys->caCerts) < 0) {
+	if (matrixX509ParseCert(NULL, caCert, caCertLen, &lkeys->caCerts) < 0) {
 		matrixStrDebugMsg("Error parsing CA cert\n", NULL);
-		psFree(tmp);
 		matrixSslFreeKeys(lkeys);
 		return -1;
 	}
-	psFree(tmp);
+	psFree(caCert);
 #endif /* USE_CLIENT_SIDE_SSL */
 	return 0;
 }
@@ -251,13 +257,13 @@ int	matrixSslReadKeysMem(sslKeys_t **keys, char *certBuf, int certLen,
 	The first in the list must be the identifying cert of the application.
 	Each subsequent cert is the next parent.
 */
-static int readCertChain(char *certFiles, sslKeys_t *lkeys)
+static int32 readCertChain(char *certFiles, sslKeys_t *lkeys)
 {
 	sslLocalCert_t	*currCert;
-	char			sep[] = ";";
+	const char		sep[] = ";";
 	char			*cert, *origList;
 	unsigned char	*certBin;
-	int				certLen, i;
+	int32			certLen, i;
 
 	if (certFiles == NULL) {
 		return 0;
@@ -282,7 +288,10 @@ static int readCertChain(char *certFiles, sslKeys_t *lkeys)
 		if (i++ == 0) {
 			currCert = &lkeys->cert;
 		} else {
-			currCert->next = psMalloc(sizeof(sslLocalCert_t));
+			currCert->next = psMalloc(NULL, sizeof(sslLocalCert_t));
+			if (currCert->next == NULL) {
+				return SSL_MEM_ERROR;
+			}
 			memset(currCert->next, 0x0, sizeof(sslLocalCert_t));
 			currCert = currCert->next;
 		}
@@ -297,17 +306,20 @@ static int readCertChain(char *certFiles, sslKeys_t *lkeys)
 /*
  *	Strtok substitute
  */
-static int parseList(char *list, char *sep, char **item)
+static int32 parseList(char *list, const char *sep, char **item)
 {
-	int			start, listLen;
-	char		*tmp;
+	int32	start, listLen;
+	char	*tmp;
 
-	start = listLen = (int)strlen(list) + 1;
+	start = listLen = (int32)strlen(list) + 1;
 	if (start == 1) {
 		*item = NULL;
 		return 0;
 	}
-	tmp = *item = psMalloc(listLen);
+	tmp = *item = psMalloc(NULL, listLen);
+	if (tmp == NULL) {
+		return SSL_MEM_ERROR;
+	}
 	memset(*item, 0, listLen);
 	while (listLen > 0) {
 		if (*list == sep[0]) {
@@ -331,7 +343,7 @@ static int parseList(char *list, char *sep, char **item)
 void matrixSslFreeKeys(sslKeys_t *keys)
 {
 	sslLocalCert_t	*current, *next;
-	int				i = 0;
+	int32			i = 0;
 
 	if (keys) {
 		current = &keys->cert;
@@ -358,6 +370,7 @@ void matrixSslFreeKeys(sslKeys_t *keys)
 	}
 }
 
+
 /******************************************************************************/
 /*
 	New SSL protocol context
@@ -368,10 +381,13 @@ void matrixSslFreeKeys(sslKeys_t *keys)
 	to minimize memory usage with multiple simultaneous requests.  They must 
 	not be deleted by caller until all server contexts using them are deleted.
 */
-int matrixSslNewSession(ssl_t **ssl, sslKeys_t *keys, sslSessionId_t *session,
-						int flags)
+int32 matrixSslNewSession(ssl_t **ssl, sslKeys_t *keys, sslSessionId_t *session,
+						int32 flags)
 {
-	ssl_t			*lssl;
+	psPool_t	*pool;
+	ssl_t		*lssl;
+
+	pool = NULL;
 
 /*
 	First API level chance to make sure a user is not attempting to use
@@ -391,6 +407,7 @@ int matrixSslNewSession(ssl_t **ssl, sslKeys_t *keys, sslSessionId_t *session,
 		return -1;
 	}
 #endif
+
 	if (flags & SSL_FLAGS_SERVER) {
 		if (keys == NULL) {
 			matrixStrDebugMsg("NULL keys in  matrixSslNewSession\n", NULL);
@@ -401,9 +418,13 @@ int matrixSslNewSession(ssl_t **ssl, sslKeys_t *keys, sslSessionId_t *session,
 			return -1;
 		}
 	}
-	*ssl = lssl = psMalloc(sizeof(ssl_t));
+	*ssl = lssl = psMalloc(pool, sizeof(ssl_t));
+	if (lssl == NULL) {
+		return SSL_MEM_ERROR;
+	}
 	memset(lssl, 0x0, sizeof(ssl_t));
 
+	lssl->pool = pool;
 	lssl->cipher = sslGetCipherSpec(SSL_NULL_WITH_NULL_NULL);
 	sslActivateReadCipher(lssl);
 	sslActivateWriteCipher(lssl);
@@ -447,6 +468,8 @@ int matrixSslNewSession(ssl_t **ssl, sslKeys_t *keys, sslSessionId_t *session,
 */
 void matrixSslDeleteSession(ssl_t *ssl)
 {
+	psPool_t	*pool, *hsPool;
+
 	if (ssl == NULL) {
 		return;
 	}
@@ -473,16 +496,12 @@ void matrixSslDeleteSession(ssl_t *ssl)
 		ssl->sec.cert = NULL;
 	}
 #endif /* USE_CLIENT_SIDE_SSL */
-	if (ssl->sec.keyBlock) {
-		memset(ssl->sec.keyBlock, 0x0, 2 * ssl->cipher->macSize +
-			2 * ssl->cipher->keySize + 2 * ssl->cipher->ivSize);
-		psFree(ssl->sec.keyBlock);
-		ssl->sec.keyBlock = NULL;
-	}
 /*
 	The cipher and mac contexts are inline in the ssl structure, so
 	clearing the structure clears those states as well.
 */
+	pool = ssl->pool;
+	hsPool = ssl->hsPool;
 	memset(ssl, 0x0, sizeof(ssl_t));
 	psFree(ssl);
 }
@@ -493,7 +512,7 @@ void matrixSslDeleteSession(ssl_t *ssl)
 	(ie. rehandshake control).  arg param is future for options that may
 	require a value.
 */
-void matrixSslSetSessionOption(ssl_t *ssl, int option, void *arg)
+void matrixSslSetSessionOption(ssl_t *ssl, int32 option, void *arg)
 {
 	if (option == SSL_OPTION_DELETE_SESSION) {
 #ifdef USE_SERVER_SIDE_SSL
@@ -510,7 +529,7 @@ void matrixSslSetSessionOption(ssl_t *ssl, int option, void *arg)
 /*
 	Returns 1 if we've completed the SSL handshake.  0 if we're in process.
 */
-int matrixSslHandshakeIsComplete(ssl_t *ssl)
+int32 matrixSslHandshakeIsComplete(ssl_t *ssl)
 {
 	return (ssl->hsState == SSL_HS_DONE) ? 1 : 0;
 }
@@ -522,7 +541,7 @@ int matrixSslHandshakeIsComplete(ssl_t *ssl)
 	session to perform custom authentication if needed
 */
 void matrixSslSetCertValidator(ssl_t *ssl,
-				int (*certValidator)(sslCertInfo_t *t, void *arg), void *arg)
+				int32 (*certValidator)(sslCertInfo_t *t, void *arg), void *arg)
 {
 	if (certValidator) {
 		ssl->sec.validateCert = certValidator;
@@ -531,7 +550,7 @@ void matrixSslSetCertValidator(ssl_t *ssl,
 }
 #else /* Public API, so should always be linkable */
 void matrixSslSetCertValidator(ssl_t *ssl,
-				int (*certValidator)(sslCertInfo_t *t, void *arg), void *arg)
+				int32 (*certValidator)(sslCertInfo_t *t, void *arg), void *arg)
 {
 	matrixStrDebugMsg("matrixSslSetCertValidator is not available\n", NULL);
 	matrixStrDebugMsg("Library not built for cert validation support\n", NULL);
@@ -542,7 +561,7 @@ void matrixSslSetCertValidator(ssl_t *ssl,
 /*
 	Initialize the SHA1 and MD5 hash contexts for the handshake messages
 */
-int sslInitHSHash(ssl_t *ssl)
+int32 sslInitHSHash(ssl_t *ssl)
 {
 	matrixSha1Init(&ssl->sec.msgHashSha1);
 	matrixMd5Init(&ssl->sec.msgHashMd5);
@@ -553,7 +572,7 @@ int sslInitHSHash(ssl_t *ssl)
 /*
 	Add the given data to the running hash of the handshake messages
 */
-int sslUpdateHSHash(ssl_t *ssl, unsigned char *in, int len)
+int32 sslUpdateHSHash(ssl_t *ssl, unsigned char *in, int32 len)
 {
 	matrixMd5Update(&ssl->sec.msgHashMd5, in, len);
 	matrixSha1Update(&ssl->sec.msgHashSha1, in, len);
@@ -566,7 +585,7 @@ int sslUpdateHSHash(ssl_t *ssl, unsigned char *in, int len)
 	a hash of the preceeding handshake messages for comparison to incoming
 	message.
 */
-int sslSnapshotHSHash(ssl_t *ssl, unsigned char *out, int senderFlag)
+int32 sslSnapshotHSHash(ssl_t *ssl, unsigned char *out, int32 senderFlag)
 {
 	sslMd5Context_t		md5;
 	sslSha1Context_t	sha1;
@@ -589,7 +608,7 @@ int sslSnapshotHSHash(ssl_t *ssl, unsigned char *out, int senderFlag)
 	are activated at different times in the handshake process.  The following
 	APIs activate the selected cipher suite callback functions.
 */
-int sslActivateReadCipher(ssl_t *ssl)
+int32 sslActivateReadCipher(ssl_t *ssl)
 {
 	ssl->decrypt = ssl->cipher->decrypt;
 	ssl->verifyMac = ssl->cipher->verifyMac;
@@ -620,7 +639,7 @@ int sslActivateReadCipher(ssl_t *ssl)
 	return 0;
 }
 
-int sslActivateWriteCipher(ssl_t *ssl)
+int32 sslActivateWriteCipher(ssl_t *ssl)
 {
 	ssl->encrypt = ssl->cipher->encrypt;
 	ssl->generateMac = ssl->cipher->generateMac;
@@ -650,7 +669,7 @@ int sslActivateWriteCipher(ssl_t *ssl)
 	return 0;
 }
 
-int sslActivatePublicCipher(ssl_t *ssl)
+int32 sslActivatePublicCipher(ssl_t *ssl)
 {
 	ssl->decryptPriv = ssl->cipher->decryptPriv;
 	ssl->encryptPub = ssl->cipher->encryptPub;
@@ -667,10 +686,10 @@ int sslActivatePublicCipher(ssl_t *ssl)
 	the ssl sessionId and sessionIdLength fields will be non-NULL upon
 	return.
 */
-int matrixRegisterSession(ssl_t *ssl)
+int32 matrixRegisterSession(ssl_t *ssl)
 {
-	unsigned int	i, j;
-	sslTime_t		t;
+	uint32		i, j;
+	sslTime_t	t;
 
 	if (!(ssl->flags & SSL_FLAGS_SERVER)) {
 		return -1;
@@ -750,10 +769,10 @@ int matrixRegisterSession(ssl_t *ssl)
 /*
 	Clear the inUse flag during re-handshakes so the entry may be found
 */
-int matrixClearSession(ssl_t *ssl, int remove)
+int32 matrixClearSession(ssl_t *ssl, int32 remove)
 {
-	char			*id;
-	unsigned int	i;
+	char	*id;
+	uint32	i;
 
 	if (ssl->sessionIdLen <= 0) {
 		return -1;
@@ -786,10 +805,10 @@ int matrixClearSession(ssl_t *ssl, int remove)
 	Look up a session ID in the cache.  If found, set the ssl masterSecret
 	and cipher to the pre-negotiated values
 */
-int matrixResumeSession(ssl_t *ssl)
+int32 matrixResumeSession(ssl_t *ssl)
 {
-	char			*id;
-	unsigned int	i;
+	char	*id;
+	uint32	i;
 
 	if (!(ssl->flags & SSL_FLAGS_SERVER)) {
 		return -1;
@@ -836,10 +855,10 @@ int matrixResumeSession(ssl_t *ssl)
 	This is called when we've determined the master secret and when we're
 	closing the connection to update various values in the cache.
 */
-int matrixUpdateSession(ssl_t *ssl)
+int32 matrixUpdateSession(ssl_t *ssl)
 {
-	char			*id;
-	unsigned int	i;
+	char	*id;
+	uint32	i;
 
 	if (!(ssl->flags & SSL_FLAGS_SERVER)) {
 		return -1;
@@ -877,7 +896,7 @@ int matrixUpdateSession(ssl_t *ssl)
 	session structure.  Session will contain a copy of the relevant session
 	information, suitable for creating a new, resumed session.
 */
-int matrixSslGetSessionId(ssl_t *ssl, sslSessionId_t **session)
+int32 matrixSslGetSessionId(ssl_t *ssl, sslSessionId_t **session)
 {
 	sslSessionId_t *lsession;
 
@@ -887,7 +906,10 @@ int matrixSslGetSessionId(ssl_t *ssl, sslSessionId_t **session)
 
 	if (ssl->cipher != NULL && ssl->cipher->id != SSL_NULL_WITH_NULL_NULL && 
 			ssl->sessionIdLen == SSL_MAX_SESSION_ID_SIZE) {
-		*session = lsession = psMalloc(sizeof(sslSessionId_t));
+		*session = lsession = psMalloc(NULL, sizeof(sslSessionId_t));
+		if (lsession == NULL) {
+			return SSL_MEM_ERROR;
+		}
 		lsession->cipherId = ssl->cipher->id;
 		memcpy(lsession->id, ssl->sessionId, ssl->sessionIdLen);
 		memcpy(lsession->masterSecret, ssl->sec.masterSecret, 
@@ -925,26 +947,16 @@ void sslResetContext(ssl_t *ssl)
 	}
 #endif /* USE_SERVER_SIDE_SSL */
 
-#ifdef USE_CLIENT_SIDE_SSL
-/*
-	Free the cert and keyBlock.  New ones will be generated.
-*/
-	if (ssl->sec.cert) {
-		matrixX509FreeCert(ssl->sec.cert);
-		ssl->sec.cert = NULL;
-	}
-#endif /* USE_CLIENT_SIDE */
-	if (ssl->sec.keyBlock) {
-		psFree(ssl->sec.keyBlock);
-		ssl->sec.keyBlock = NULL;
-	}
+	sslAssert(ssl->hsPool == NULL);
 }
+
 /******************************************************************************/
 /*
 	Debugging APIs
 */
 #ifdef DEBUG
 
+/* message should contain one %s */
 void matrixStrDebugMsg(char *message, char *value)
 {
 	if (value) {
@@ -953,7 +965,15 @@ void matrixStrDebugMsg(char *message, char *value)
 		printf(message);
 	}
 }
-void matrixIntDebugMsg(char *message, int value)
+
+/* message should contain one %d */
+void matrixIntDebugMsg(char *message, int32 value)
+{
+	printf(message, value);
+}
+
+/* message should contain one %p */
+void matrixPtrDebugMsg(char *message, void *value)
 {
 	printf(message, value);
 }
@@ -961,4 +981,5 @@ void matrixIntDebugMsg(char *message, int value)
 #endif /* DEBUG */
 
 /******************************************************************************/
+
 

@@ -14,6 +14,19 @@ MODULE = Crypt::MatrixSSL		PACKAGE = Crypt::MatrixSSL
 
 ##############################################################################################	
 
+=head1 NAME
+
+MatrixSSL.xs - perl interface to the MatrixSSL crypto library (which is in C++)
+
+
+=head1 ABOUT THIS DOCUMENTATION
+
+The documentation here (in the MatrixSSL.xs file) originally came from the MatrixSSL 
+specification documents (for version 1-1-2). See here http://www.matrixssl.org/docs.html
+or here http://www.matrixssl.org/doc/MatrixSSLApi.pdf for the nicely formatted and
+most current version.
+
+
 =head2 matrixSslOpen
 
 Prototype
@@ -1006,7 +1019,7 @@ matrixSslSetCertValidator(session, callback, arg)
 
 
 
-=head3 testing
+=for debug
 
 void
 hello()

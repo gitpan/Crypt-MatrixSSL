@@ -1,12 +1,12 @@
 /*
  *	httpClient.c
- *	Release $Name: MATRIXSSL_1_2_2_OPEN $
+ *	Release $Name: MATRIXSSL_1_2_4_OPEN $
  *
  *	Simple example program for MatrixSSL
  *	Sends a HTTPS request and echos the response back to the sender.
  */
 /*
- *	Copyright (c) PeerSec Networks, 2002-2004. All Rights Reserved.
+ *	Copyright (c) PeerSec Networks, 2002-2005. All Rights Reserved.
  *	The latest version of this code is available at http://www.matrixssl.org
  *
  *	This software is open source; you can redistribute it and/or modify
@@ -51,13 +51,17 @@ static char CAfile[] = "CAcertSrv.pem";
 
 #define ITERATIONS	100 /* How many individual connections to make */
 #define REQUESTS	1  /* How many requests per each connection */
+#define REUSE		1  /* 0 if session resumption disabled */
 
-static const char request[] = "GET / HTTP/1.1\r\n"
+#define ENFORCE_CERT_VALIDATION 0 /* 0 to allow connection without validation */
+
+
+static const char request[] = "GET / HTTP/1.0\r\n"
 		"User-Agent: MatrixSSL httpClient\r\n"
 		"Accept: */*\r\n"
 		"\r\n";
 
-static const char requestAgain[] = "GET /again HTTP/1.1\r\n"
+static const char requestAgain[] = "GET /again HTTP/1.0\r\n"
 		"User-Agent: MatrixSSL httpClient\r\n"
 		"Accept: */*\r\n"
 		"\r\n";
@@ -97,7 +101,6 @@ int main(int argc, char **argv)
 #if VXWORKS
 	int					argc;
 	char				**argv;
-
 	parseCmdLineArgs(arg1, &argc, &argv);
 #endif /* VXWORKS */
 
@@ -266,8 +269,10 @@ readMore:
 		Reuse the session.  Comment out these two lines to test the entire
 		public key renegotiation each iteration
 */
+#if REUSE
 		matrixSslFreeSessionId(sessionId);
 		matrixSslGetSessionId(conn->ssl, &sessionId);
+#endif
 /*
 		Send a closure alert for clean shutdown of remote SSL connection
 		This is for good form, some implementations just close the socket
@@ -318,6 +323,7 @@ promptAndExit:
 */
 static int certChecker(sslCertInfo_t *cert, void *arg)
 {
+#if ENFORCE_CERT_VALIDATION
 	sslCertInfo_t	*next;
 /*
 	Make sure we are checking the last cert in the chain
@@ -327,9 +333,14 @@ static int certChecker(sslCertInfo_t *cert, void *arg)
 		next = next->next;
 	}
 	return next->verified;
+#else
+	return 1;
+#endif /* ENFORCE_CERT_VALIDATION */
 }	
 
 /******************************************************************************/
+
+
 
 
 

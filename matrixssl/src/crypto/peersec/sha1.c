@@ -1,11 +1,11 @@
 /*
  *	sha1.c
- *	Release $Name: MATRIXSSL_1_2_2_OPEN $
+ *	Release $Name: MATRIXSSL_1_2_4_OPEN $
  *
  *	SHA1 hash implementation
  */
 /*
- *	Copyright (c) PeerSec Networks, 2002-2004. All Rights Reserved.
+ *	Copyright (c) PeerSec Networks, 2002-2005. All Rights Reserved.
  *	The latest version of this code is available at http://www.matrixssl.org
  *
  *	This software is open source; you can redistribute it and/or modify
@@ -204,9 +204,9 @@ void matrixSha1Update(hash_state * md, const unsigned char *buf, unsigned long l
 	}
 }
 
-int matrixSha1Final(hash_state * md, unsigned char *hash)
+int32 matrixSha1Final(hash_state * md, unsigned char *hash)
 {
-	int i;
+	int32 i;
 #ifndef USE_INT64
 	unsigned long	n;
 #endif
@@ -278,7 +278,7 @@ int matrixSha1Final(hash_state * md, unsigned char *hash)
 
 #ifdef PEERSEC_TEST
 
-int  matrixSha1Test()
+int32  matrixSha1Test()
 {
 	static const struct {
 		char *msg;
@@ -296,11 +296,11 @@ int  matrixSha1Test()
 		}
 	};
 
-	int i;
+	int32 i;
 	unsigned char tmp[20];
 	hash_state md;
 
-	for (i = 0; i < (int)(sizeof(tests) / sizeof(tests[0]));  i++) {
+	for (i = 0; i < (int32)(sizeof(tests) / sizeof(tests[0]));  i++) {
 		matrixSha1Init(&md);
 		matrixSha1Update(&md, (unsigned char*)tests[i].msg, (unsigned long)strlen(tests[i].msg));
 		matrixSha1Final(&md, tmp);

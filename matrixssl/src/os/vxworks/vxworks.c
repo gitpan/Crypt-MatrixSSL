@@ -1,13 +1,13 @@
 /*
  *	vxworks.c
- *	Release $Name: MATRIXSSL_1_2_2_OPEN $
+ *	Release $Name: MATRIXSSL_1_2_4_OPEN $
  *
  *	VXWORKS compatibility layer
  *	Other UNIX like operating systems should also be able to use this
  *	implementation without change.
  */
 /*
- *	Copyright (c) PeerSec Networks, 2002-2004. All Rights Reserved.
+ *	Copyright (c) PeerSec Networks, 2002-2005. All Rights Reserved.
  *	The latest version of this code is available at http://www.matrixssl.org
  *
  *	This software is open source; you can redistribute it and/or modify
@@ -30,6 +30,7 @@
  *	http://www.gnu.org/copyleft/gpl.html
  */
 /******************************************************************************/
+
 #ifdef VXWORKS
 #include <fcntl.h>
 #include <errno.h>
@@ -51,7 +52,7 @@ int sslOpenOsdep()
 {
 	tickspersec = sysClkRateGet();
 
-	sslOpenMalloc(MAX_MEMORY_USAGE);
+	psOpenMalloc(MAX_MEMORY_USAGE);
 	return 0;
 }
 
@@ -61,7 +62,7 @@ int sslOpenOsdep()
  */
 int sslCloseOsdep()
 {
-	sslCloseMalloc();
+	psCloseMalloc();
 	return 0;
 }
 
@@ -71,7 +72,7 @@ int sslCloseOsdep()
 	depending on platform.
  */
 
-int sslGetEntropy(char *bytes, int size)
+int sslGetEntropy(unsigned char *bytes, int size)
 {
 	return 0;
 }

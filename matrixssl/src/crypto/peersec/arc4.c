@@ -1,11 +1,11 @@
 /*
  *	arc4.c
- *	Release $Name: MATRIXSSL_1_2_2_OPEN $
+ *	Release $Name: MATRIXSSL_1_2_4_OPEN $
  *
  *	ARC4 stream cipher implementation
  */
 /*
- *	Copyright (c) PeerSec Networks, 2002-2004. All Rights Reserved.
+ *	Copyright (c) PeerSec Networks, 2002-2005. All Rights Reserved.
  *	The latest version of this code is available at http://www.matrixssl.org
  *
  *	This software is open source; you can redistribute it and/or modify
@@ -44,7 +44,7 @@
 /*
 	SSL_RSA_WITH_RC4_* cipher callbacks
  */
-void matrixArc4Init(sslCipherContext_t *ctx, unsigned char *key, int keylen)
+void matrixArc4Init(sslCipherContext_t *ctx, unsigned char *key, int32 keylen)
 {
 	unsigned char	index1,	index2, tmp, *state;
 	short			counter;
@@ -71,8 +71,8 @@ void matrixArc4Init(sslCipherContext_t *ctx, unsigned char *key, int keylen)
 	}
 }
 
-int matrixArc4(sslCipherContext_t *ctx, unsigned char *in,
-			   unsigned char *out, int len)
+int32 matrixArc4(sslCipherContext_t *ctx, unsigned char *in,
+			   unsigned char *out, int32 len)
 {
 	unsigned char	x, y, *state, xorIndex, tmp;
 	short			counter;

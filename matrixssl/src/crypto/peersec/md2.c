@@ -1,33 +1,11 @@
 /*
  *	md2.c
- *	Release $Name: MATRIXSSL_1_2_2_OPEN $
+ *	Release $Name: MATRIXSSL_1_2_4_OPEN $
  *
  *	MD2 hash implementation
  */
-#ifdef PEERSEC_COMMERCIAL
 /*
- *	(C)Copyright 2002-2004 PeerSec Networks LLC
- *	All Rights Reserved
- *
- *	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF PEERSEC NETWORKS LLC
- *
- *	The copyright notice above does not evidence any actual or intended
- *	publication of such source code.
- *
- *	This Module contains Proprietary Information of PeerSec Networks LLC
- *	and should be treated as Confidential.
- *
- *	The information in this file is provided for the exclusive use of the
- *	licensees of PeerSec Networks. Such users have the right to use, modify,
- *	and incorporate this code into products for purposes authorized by the
- *	license agreement provided they include this notice and the associated
- *	copyright notice with any such product.
- *
- *	The information in this file is provided "AS IS" without warranty.
- */
-#else
-/*
- *	Copyright (c) PeerSec Networks, 2002-2004. All Rights Reserved.
+ *	Copyright (c) PeerSec Networks, 2002-2005. All Rights Reserved.
  *	The latest version of this code is available at http://www.matrixssl.org
  *
  *	This software is open source; you can redistribute it and/or modify
@@ -49,7 +27,6 @@
  *	Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *	http://www.gnu.org/copyleft/gpl.html
  */
-#endif /* PEERSEC_COMMERCIAL */
 /******************************************************************************/
 
 #include "../cryptoLayer.h"
@@ -80,7 +57,7 @@ static const unsigned char PI_SUBST[256] = {
 /* adds 16 bytes to the checksum */
 static void md2_update_chksum(hash_state *md)
 {
-   int j;
+   int32 j;
    unsigned char L;
    L = md->md2.chksum[15];
    for (j = 0; j < 16; j++) {
@@ -88,13 +65,13 @@ static void md2_update_chksum(hash_state *md)
 /* caution, the RFC says its "C[j] = S[M[i*16+j] xor L]" but the reference source code [and test vectors] say 
    otherwise.
 */
-       L = (md->md2.chksum[j] ^= PI_SUBST[(int)(md->md2.buf[j] ^ L)] & 255);
+       L = (md->md2.chksum[j] ^= PI_SUBST[(int32)(md->md2.buf[j] ^ L)] & 255);
    }
 }
 
 static void md2_compress(hash_state *md)
 {
-   int j, k;
+   int32 j, k;
    unsigned char t;
    
    /* copy block */
@@ -108,7 +85,7 @@ static void md2_compress(hash_state *md)
    /* do 18 rounds */
    for (j = 0; j < 18; j++) {
        for (k = 0; k < 48; k++) {
-           t = (md->md2.X[k] ^= PI_SUBST[(int)(t & 255)]);
+           t = (md->md2.X[k] ^= PI_SUBST[(int32)(t & 255)]);
        }
        t = (t + (unsigned char)j) & 255;
    }
@@ -125,7 +102,7 @@ void matrixMd2Init(hash_state *md)
    md->md2.curlen = 0;
 }
 
-int matrixMd2Update(hash_state *md, const unsigned char *buf, unsigned long len)
+int32 matrixMd2Update(hash_state *md, const unsigned char *buf, unsigned long len)
 {
     unsigned long n;
     sslAssert(md != NULL);
@@ -150,7 +127,7 @@ int matrixMd2Update(hash_state *md, const unsigned char *buf, unsigned long len)
     return CRYPT_OK;
 }
 
-int matrixMd2Final(hash_state * md, unsigned char *hash)
+int32 matrixMd2Final(hash_state * md, unsigned char *hash)
 {
     unsigned long i, k;
 
@@ -187,7 +164,7 @@ int matrixMd2Final(hash_state * md, unsigned char *hash)
 
 #ifdef PEERSEC_TEST
 
-int matrixMd2Test(void)
+int32 matrixMd2Test(void)
 { 
    static const struct {
         char *msg;
@@ -224,11 +201,11 @@ int matrixMd2Test(void)
         }
       }
    };
-   int i;
+   int32 i;
    hash_state md;
    unsigned char buf[16];
 
-   for (i = 0; i < (int)(sizeof(tests) / sizeof(tests[0])); i++) {
+   for (i = 0; i < (int32)(sizeof(tests) / sizeof(tests[0])); i++) {
        matrixMd2Init(&md);
        matrixMd2Update(&md, (unsigned char*)tests[i].msg, (unsigned long)strlen(tests[i].msg));
        matrixMd2Final(&md, buf);

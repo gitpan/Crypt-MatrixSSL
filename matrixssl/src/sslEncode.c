@@ -1,11 +1,11 @@
 /*
  *	sslEncode.c
- *	Release $Name: MATRIXSSL_1_2_2_OPEN $
+ *	Release $Name: MATRIXSSL_1_2_4_OPEN $
  *
  *	Secure Sockets Layer message encoding
  */
 /*
- *	Copyright (c) PeerSec Networks, 2002-2004. All Rights Reserved.
+ *	Copyright (c) PeerSec Networks, 2002-2005. All Rights Reserved.
  *	The latest version of this code is available at http://www.matrixssl.org
  *
  *	This software is open source; you can redistribute it and/or modify
@@ -33,31 +33,31 @@
 
 /******************************************************************************/
 
-static int writeCertificate(ssl_t *ssl, sslBuf_t *out, int notEmpty);
-static int writeChangeCipherSpec(ssl_t *ssl, sslBuf_t *out);
-static int writeFinished(ssl_t *ssl, sslBuf_t *out);
-static int writeAlert(ssl_t *ssl, unsigned char level, 
+static int32 writeCertificate(ssl_t *ssl, sslBuf_t *out, int32 notEmpty);
+static int32 writeChangeCipherSpec(ssl_t *ssl, sslBuf_t *out);
+static int32 writeFinished(ssl_t *ssl, sslBuf_t *out);
+static int32 writeAlert(ssl_t *ssl, unsigned char level, 
 						unsigned char description, sslBuf_t *out);
-static int writeRecordHeader(ssl_t *ssl, int type, int hsType, int *messageSize,
+static int32 writeRecordHeader(ssl_t *ssl, int32 type, int32 hsType, int32 *messageSize,
 						char *padLen, unsigned char **encryptStart,
 						unsigned char **end, unsigned char **c);
-static int encryptRecord(ssl_t *ssl, int type, int messageSize, int padLen, 
+static int32 encryptRecord(ssl_t *ssl, int32 type, int32 messageSize, int32 padLen, 
 						unsigned char *encryptStart, sslBuf_t *out,
 						unsigned char **c);
 
 #ifdef USE_CLIENT_SIDE_SSL
-static int writeClientKeyExchange(ssl_t *ssl, sslBuf_t *out);
+static int32 writeClientKeyExchange(ssl_t *ssl, sslBuf_t *out);
 #endif /* USE_CLIENT_SIDE_SSL */
 
 
 #ifdef USE_SERVER_SIDE_SSL
-static int writeServerHello(ssl_t *ssl, sslBuf_t *out);
-static int writeServerHelloDone(ssl_t *ssl, sslBuf_t *out);
+static int32 writeServerHello(ssl_t *ssl, sslBuf_t *out);
+static int32 writeServerHelloDone(ssl_t *ssl, sslBuf_t *out);
 #endif /* USE_SERVER_SIDE_SSL */
 
 
-static int sslWritePad(unsigned char *p, unsigned char padLen);
-static int secureWriteAdditions(ssl_t *ssl, int numRecs);
+static int32 sslWritePad(unsigned char *p, unsigned char padLen);
+static int32 secureWriteAdditions(ssl_t *ssl, int32 numRecs);
 
 /******************************************************************************/
 /*
@@ -69,11 +69,11 @@ static int secureWriteAdditions(ssl_t *ssl, int numRecs);
 	incompatible with some SSL implementations (including some versions of IE).
 	http://www.openssl.org/~bodo/tls-cbc.txt
 */
-int matrixSslEncode(ssl_t *ssl, unsigned char *in, int inlen, sslBuf_t *out)
+int32 matrixSslEncode(ssl_t *ssl, unsigned char *in, int32 inlen, sslBuf_t *out)
 {
 	unsigned char	*c, *end, *encryptStart;
 	char			padLen;
-	int				messageSize, rc;
+	int32			messageSize, rc;
 /*
 	If we've had a protocol error, don't allow further use of the session
 	Also, don't allow a application data record to be encoded unless the
@@ -87,6 +87,9 @@ int matrixSslEncode(ssl_t *ssl, unsigned char *in, int inlen, sslBuf_t *out)
 	end = out->buf + out->size;
 	messageSize = ssl->recordHeadLen + inlen;
 
+/*
+	Validate size constraint
+*/
 	if (messageSize > SSL_MAX_BUF_SIZE) {
 		return SSL_ERROR;
 	}
@@ -105,7 +108,7 @@ int matrixSslEncode(ssl_t *ssl, unsigned char *in, int inlen, sslBuf_t *out)
 	}
 	out->end = c;
 
-	return (int)(out->end - out->start);
+	return (int32)(out->end - out->start);
 }
 
 /******************************************************************************/
@@ -114,14 +117,15 @@ int matrixSslEncode(ssl_t *ssl, unsigned char *in, int inlen, sslBuf_t *out)
 	to write internal data to the remote host.  The caller will call this 
 	function to generate a message appropriate to our state.
 */
-int sslEncodeResponse(ssl_t *ssl, sslBuf_t *out)
+int32 sslEncodeResponse(ssl_t *ssl, sslBuf_t *out)
 {
-	int				messageSize;
-	int				rc = SSL_ERROR;
+	int32			messageSize;
+	int32			rc = SSL_ERROR;
 #ifdef USE_SERVER_SIDE_SSL
-	int				totalCertLen, i;
+	int32			totalCertLen, i;
 	sslLocalCert_t	*cert;
 #endif /* USE_SERVER_SIDE_SSL */
+
 
 /*
 	We may be trying to encode an alert response if there is an error marked
@@ -230,18 +234,84 @@ int sslEncodeResponse(ssl_t *ssl, sslBuf_t *out)
 				return SSL_ERROR;
 			}
 			messageSize = 0;
+/*
+			Client authentication requires the client to send a CERTIFICATE
+			and CERTIFICATE_VERIFY message.  Account for the length.  It
+			is possible the client didn't have a match for the requested cert.
+			Send an empty certificate message in that case (or alert for SSLv3)
+*/
+			if (ssl->flags & SSL_FLAGS_CLIENT_AUTH) {
+				if (ssl->sec.certMatch == 1) {
+/*
+					Account for the certificate and certificateVerify messages
+*/
+					messageSize += 6 + (2 * ssl->recordHeadLen) +
+						(2 * ssl->hshakeHeadLen) + ssl->keys->cert.certLen +
+						2 +	ssl->keys->cert.privKey->size;
+				} else {
+/*
+					SSLv3 sends a no_certificate warning alert for no match
+*/
+					if (ssl->majVer == SSL3_MAJ_VER
+							&& ssl->minVer == SSL3_MIN_VER) {
+						messageSize += 2 + ssl->recordHeadLen;
+					} else {
+/*
+						TLS just sends an empty certificate message
+*/
+						messageSize += 3 + ssl->recordHeadLen +
+							ssl->hshakeHeadLen;
+					}
+				}
+			}
+/*
+			Account for the header and message size for all records.  The
+			finished message will always be encrypted, so account for one
+			largest possible MAC size and block size.  Minus one
+			for padding.  The finished message is not accounted for in the
+			writeSecureAddition calls below since it is accounted for here.
+*/
 			messageSize +=
 				3 * ssl->recordHeadLen +
 				2 * ssl->hshakeHeadLen +
 				ssl->sec.cert->publicKey.size + /* client key exchange */
 				1 + /* change cipher spec */
-				SSL_MD5_HASH_SIZE + SSL_SHA1_HASH_SIZE; /* finished */
-			messageSize += secureWriteAdditions(ssl, 3);
-
+				SSL_MD5_HASH_SIZE + SSL_SHA1_HASH_SIZE + /* SSLv3 finished */
+				SSL_MAX_MAC_SIZE + SSL_MAX_BLOCK_SIZE - 1;
+			if (ssl->flags & SSL_FLAGS_CLIENT_AUTH) {
+/*
+				Secure write for ClientKeyExchange, ChangeCipherSpec,
+				Certificate, and CertificateVerify.  Don't account for
+				Certificate and/or CertificateVerify message if no auth cert.
+				This will also cover the NO_CERTIFICATE alert sent in
+				replacement of the NULL certificate message in SSLv3.
+*/
+				if (ssl->sec.certMatch == 1) {
+					messageSize += secureWriteAdditions(ssl, 4);
+				} else {
+					messageSize += secureWriteAdditions(ssl, 3);
+				}
+			} else {
+				messageSize += secureWriteAdditions(ssl, 2);
+			}
+/*
+			The actual buffer size test to hold this flight
+*/
 			if ((out->buf + out->size) - out->end < messageSize) {
 				return SSL_FULL;
 			}
 			rc = SSL_SUCCESS;
+
+			if (ssl->flags & SSL_FLAGS_CLIENT_AUTH) {
+				if (ssl->sec.certMatch == 0 && ssl->majVer == SSL3_MAJ_VER
+							&& ssl->minVer == SSL3_MIN_VER) {
+					rc = writeAlert(ssl, SSL_ALERT_LEVEL_WARNING,
+						SSL_ALERT_NO_CERTIFICATE, out);
+				} else {
+					rc = writeCertificate(ssl, out, ssl->sec.certMatch);
+				}
+			}
+
 			if (rc == SSL_SUCCESS) {
 				rc = writeClientKeyExchange(ssl, out);
 			}
@@ -268,9 +338,9 @@ int sslEncodeResponse(ssl_t *ssl, sslBuf_t *out)
 	the writeRecordHeader call since some of the handshake hashing could
 	have already taken place and we can't rewind those hashes.
 */
-static int secureWriteAdditions(ssl_t *ssl, int numRecs)
+static int32 secureWriteAdditions(ssl_t *ssl, int32 numRecs)
 {
-	int add = 0;
+	int32 add = 0;
 /*
 	There is a slim chance for a false FULL message due to the fact that
 	the maximum padding is being calculated rather than the actual number.
@@ -288,7 +358,7 @@ static int secureWriteAdditions(ssl_t *ssl, int numRecs)
 	Write out a closure alert message (the only user initiated alert)
 	The user would call this when about to initate a socket close
 */
-int matrixSslEncodeClosureAlert(ssl_t *ssl, sslBuf_t *out)
+int32 matrixSslEncodeClosureAlert(ssl_t *ssl, sslBuf_t *out)
 {
 /*
 	If we've had a protocol error, don't allow further use of the session
@@ -306,11 +376,11 @@ int matrixSslEncodeClosureAlert(ssl_t *ssl, sslBuf_t *out)
 	change cipher spec.  Determines message length for encryption and
 	writes out to buffer up to the real message data.
 */
-static int writeRecordHeader(ssl_t *ssl, int type, int hsType, int *messageSize,
+static int32 writeRecordHeader(ssl_t *ssl, int32 type, int32 hsType, int32 *messageSize,
 						char *padLen, unsigned char **encryptStart,
 						unsigned char **end, unsigned char **c)
 {
-	int	messageData, msn;
+	int32	messageData, msn;
 
 	messageData = *messageSize - ssl->recordHeadLen;
 	if (type == SSL_RECORD_TYPE_HANDSHAKE) {
@@ -366,20 +436,20 @@ static int writeRecordHeader(ssl_t *ssl, int type, int hsType, int *messageSize,
 	an SSL record.  Updates handshake hash if necessary, generates message
 	MAC, writes the padding, and does the encrytion.
 */
-static int encryptRecord(ssl_t *ssl, int type, int messageSize, int padLen, 
+static int32 encryptRecord(ssl_t *ssl, int32 type, int32 messageSize, int32 padLen, 
 							 unsigned char *encryptStart, sslBuf_t *out,
 							 unsigned char **c)
 {
 	if (type == SSL_RECORD_TYPE_HANDSHAKE) {
-		sslUpdateHSHash(ssl, encryptStart, (int)(*c - encryptStart));
+		sslUpdateHSHash(ssl, encryptStart, (int32)(*c - encryptStart));
 	}
 	*c += ssl->generateMac(ssl, type, encryptStart, 
-		(int)(*c - encryptStart), *c);
+		(int32)(*c - encryptStart), *c);
 	
 	*c += sslWritePad(*c, padLen);
 
 	if (ssl->encrypt(&ssl->sec.encryptCtx, encryptStart, encryptStart, 
-			(int)(*c - encryptStart)) < 0 || *c - out->end != messageSize) {
+			(int32)(*c - encryptStart)) < 0 || *c - out->end != messageSize) {
 		matrixStrDebugMsg("Error encrypting message for write\n", NULL);
 		return SSL_ERROR;
 	}
@@ -391,11 +461,11 @@ static int encryptRecord(ssl_t *ssl, int type, int messageSize, int padLen,
 /*
 	Write out the ServerHello message
 */
-static int writeServerHello(ssl_t *ssl, sslBuf_t *out)
+static int32 writeServerHello(ssl_t *ssl, sslBuf_t *out)
 {
 	unsigned char	*c, *end, *encryptStart;
 	char			padLen;
-	int				messageSize, rc;
+	int32				messageSize, rc;
 	time_t			t;
 
 	c = out->end;
@@ -496,11 +566,11 @@ static int writeServerHello(ssl_t *ssl, sslBuf_t *out)
 /*
 	ServerHelloDone message is a blank handshake message
 */
-static int writeServerHelloDone(ssl_t *ssl, sslBuf_t *out)
+static int32 writeServerHelloDone(ssl_t *ssl, sslBuf_t *out)
 {
 	unsigned char	*c, *end, *encryptStart;
 	char			padLen;
-	int				messageSize, rc;
+	int32				messageSize, rc;
 
 	c = out->end;
 	end = out->buf + out->size;
@@ -531,11 +601,11 @@ static int writeServerHelloDone(ssl_t *ssl, sslBuf_t *out)
 /*
 	Server initiated rehandshake public API call.
 */
-int matrixSslEncodeHelloRequest(ssl_t *ssl, sslBuf_t *out)
+int32 matrixSslEncodeHelloRequest(ssl_t *ssl, sslBuf_t *out)
 {
 	unsigned char	*c, *end, *encryptStart;
 	char			padLen;
-	int				messageSize, rc;
+	int32				messageSize, rc;
 
 	if (ssl->flags & SSL_FLAGS_ERROR || ssl->flags & SSL_FLAGS_CLOSED) {
 		return SSL_ERROR;
@@ -569,7 +639,7 @@ int matrixSslEncodeHelloRequest(ssl_t *ssl, sslBuf_t *out)
 	return SSL_SUCCESS;
 }
 #else /* USE_SERVER_SIDE_SSL */
-int matrixSslEncodeHelloRequest(ssl_t *ssl, sslBuf_t *out)
+int32 matrixSslEncodeHelloRequest(ssl_t *ssl, sslBuf_t *out)
 {
 		matrixStrDebugMsg("Library not built with USE_SERVER_SIDE_SSL\n", NULL);
 		return -1;
@@ -596,12 +666,12 @@ int matrixSslEncodeHelloRequest(ssl_t *ssl, sslBuf_t *out)
 	Certificate data is the base64 section of an X.509 certificate file
 	in PEM format decoded to binary.  No additional interpretation is required.
 */
-static int writeCertificate(ssl_t *ssl, sslBuf_t *out, int notEmpty)
+static int32 writeCertificate(ssl_t *ssl, sslBuf_t *out, int32 notEmpty)
 {
 	sslLocalCert_t	*cert;
 	unsigned char	*c, *end, *encryptStart;
 	char			padLen;
-	int				totalCertLen, certLen, lsize, messageSize, i, rc;
+	int32				totalCertLen, certLen, lsize, messageSize, i, rc;
 
 	c = out->end;
 	end = out->buf + out->size;
@@ -612,7 +682,7 @@ static int writeCertificate(ssl_t *ssl, sslBuf_t *out, int notEmpty)
 	totalCertLen = i = 0;
 	if (notEmpty) {
 		cert = &ssl->keys->cert;
-		for (;cert != NULL; i++) {
+		for (; cert != NULL; i++) {
 			totalCertLen += cert->certLen;
 			cert = cert->next;
 		}
@@ -654,7 +724,6 @@ static int writeCertificate(ssl_t *ssl, sslBuf_t *out, int notEmpty)
 			cert = cert->next;
 		}
 	}
-
 	if ((rc = encryptRecord(ssl, SSL_RECORD_TYPE_HANDSHAKE, messageSize,
 			padLen, encryptStart, out, &c)) < 0) {
 		return rc;
@@ -674,11 +743,11 @@ static int writeCertificate(ssl_t *ssl, sslBuf_t *out, int notEmpty)
 	and contains just one byte of value one.  It is not a handshake 
 	message, so it isn't included in the handshake hash.
 */
-static int writeChangeCipherSpec(ssl_t *ssl, sslBuf_t *out)
+static int32 writeChangeCipherSpec(ssl_t *ssl, sslBuf_t *out)
 {
 	unsigned char	*c, *end, *encryptStart;
 	char			padLen;
-	int				messageSize, rc;
+	int32				messageSize, rc;
 
 	c = out->end;
 	end = out->buf + out->size;
@@ -717,11 +786,11 @@ static int writeChangeCipherSpec(ssl_t *ssl, sslBuf_t *out)
 	The message contains the 36 bytes, the 16 byte MD5 and 20 byte SHA1 hash
 	of all the handshake messages so far (excluding this one!)
 */
-static int writeFinished(ssl_t *ssl, sslBuf_t *out)
+static int32 writeFinished(ssl_t *ssl, sslBuf_t *out)
 {
 	unsigned char	*c, *end, *encryptStart;
 	char			padLen;
-	int				messageSize, verifyLen, rc;
+	int32				messageSize, verifyLen, rc;
 
 	c = out->end;
 	end = out->buf + out->size;
@@ -748,6 +817,20 @@ static int writeFinished(ssl_t *ssl, sslBuf_t *out)
 	}
 	out->end = c;
 
+#ifdef USE_CLIENT_SIDE_SSL
+/*
+	Free handshake pool, of which the cert is the primary member.
+	There is also an attempt to free the handshake pool during
+	the reciept of the finished message.  Both cases are attempted
+	to keep the lifespan of this pool as short as possible. This
+	is the default case for the client side.
+*/
+	if (ssl->sec.cert) {
+		matrixX509FreeCert(ssl->sec.cert);
+		ssl->sec.cert = NULL;
+	}
+#endif /* USE_CLIENT_SIDE */
+	ssl->hsPool = NULL;
 	return SSL_SUCCESS;
 }
 
@@ -756,12 +839,12 @@ static int writeFinished(ssl_t *ssl, sslBuf_t *out)
 	Write an Alert message
 	The message contains two bytes: AlertLevel and AlertDescription
 */
-static int writeAlert(ssl_t *ssl, unsigned char level, 
+static int32 writeAlert(ssl_t *ssl, unsigned char level, 
 						unsigned char description, sslBuf_t *out)
 {
 	unsigned char	*c, *end, *encryptStart;
 	char			padLen;
-	int				messageSize, rc;
+	int32				messageSize, rc;
 
 	c = out->end;
 	end = out->buf + out->size;
@@ -788,12 +871,12 @@ static int writeAlert(ssl_t *ssl, unsigned char level,
 /*
 	Write out the ClientHello message to a buffer
 */
-int matrixSslEncodeClientHello(ssl_t *ssl, sslBuf_t *out,
+int32 matrixSslEncodeClientHello(ssl_t *ssl, sslBuf_t *out,
 							   unsigned short cipherSpec)
 {
 	unsigned char	*c, *end, *encryptStart;
 	char			padLen;
-	int				messageSize, rc, cipherLen;
+	int32				messageSize, rc, cipherLen;
 	time_t			t;
 
 	if (ssl->flags & SSL_FLAGS_ERROR || ssl->flags & SSL_FLAGS_CLOSED) {
@@ -884,12 +967,12 @@ int matrixSslEncodeClientHello(ssl_t *ssl, sslBuf_t *out,
 	Client can request a single specific cipher in the cipherSpec param
 */
 	if (cipherSpec == 0) {
-		if ((rc = sslGetCipherSpecList(c, (int)(end - c))) < 0) {
+		if ((rc = sslGetCipherSpecList(c, (int32)(end - c))) < 0) {
 			return SSL_FULL;
 		}
 		c += rc;
 	} else {
-		if ((int)(end - c) < 4) {
+		if ((int32)(end - c) < 4) {
 			return SSL_FULL;
 		}
 		*c = 0; c++;
@@ -923,6 +1006,13 @@ int matrixSslEncodeClientHello(ssl_t *ssl, sslBuf_t *out,
 	if (ssl->hsState == SSL_HS_DONE) {
 		sslResetContext(ssl);
 	}
+
+/*
+	Could be a rehandshake on a previous connection that used client auth.
+	Reset our local client auth state as the server is always the one
+	responsible for initiating it.
+*/
+	ssl->flags &= ~SSL_FLAGS_CLIENT_AUTH;
 	ssl->hsState = SSL_HS_SERVER_HELLO;
 	return SSL_SUCCESS;
 }
@@ -931,11 +1021,11 @@ int matrixSslEncodeClientHello(ssl_t *ssl, sslBuf_t *out,
 /*
 	Write a ClientKeyExchange message.
 */
-static int writeClientKeyExchange(ssl_t *ssl, sslBuf_t *out)
+static int32 writeClientKeyExchange(ssl_t *ssl, sslBuf_t *out)
 {
 	unsigned char	*c, *end, *encryptStart;
 	char			padLen;
-	int				messageSize, keyLen, rc;
+	int32				messageSize, keyLen, rc;
 
 	c = out->end;
 	end = out->buf + out->size;
@@ -954,15 +1044,15 @@ static int writeClientKeyExchange(ssl_t *ssl, sslBuf_t *out)
 	These 48 bytes are padded to the current RSA key length and encrypted
 	with the RSA key.
 */
-	ssl->sec.premaster[0] = ssl->majVer;
-	ssl->sec.premaster[1] = ssl->minVer;
+	ssl->sec.premaster[0] = ssl->reqMajVer;
+	ssl->sec.premaster[1] = ssl->reqMinVer;
 	if (sslGetEntropy(ssl->sec.premaster + 2, SSL_HS_PREMASTER_SIZE - 2) < 0) {
 		matrixStrDebugMsg("Error gathering premaster entropy\n", NULL);
 		return SSL_ERROR;
 	}
 	sslActivatePublicCipher(ssl);
-	if (ssl->encryptPub(&(ssl->sec.cert->publicKey), ssl->sec.premaster, 
-			SSL_HS_PREMASTER_SIZE, c, (int)(end - c)) != keyLen) {
+	if (ssl->encryptPub(ssl->hsPool, &(ssl->sec.cert->publicKey), ssl->sec.premaster, 
+			SSL_HS_PREMASTER_SIZE, c, (int32)(end - c)) != keyLen) {
 		matrixStrDebugMsg("Error encrypting premaster\n", NULL);
 		return SSL_FULL;
 	}
@@ -993,7 +1083,7 @@ static int writeClientKeyExchange(ssl_t *ssl, sslBuf_t *out)
 /*
 	Stub out this function rather than ifdef it out in the public header
 */
-int matrixSslEncodeClientHello(ssl_t *ssl, sslBuf_t *out,
+int32 matrixSslEncodeClientHello(ssl_t *ssl, sslBuf_t *out,
 							   unsigned short cipherSpec)
 {
 	matrixStrDebugMsg("Library not built with USE_CLIENT_SIDE_SSL\n", NULL);
@@ -1012,7 +1102,7 @@ int matrixSslEncodeClientHello(ssl_t *ssl, sslBuf_t *out,
 		2 bytes length (network byte order)
 	Returns the number of bytes written
 */
-int psWriteRecordInfo(ssl_t *ssl, unsigned char type, int len, unsigned char *c)
+int32 psWriteRecordInfo(ssl_t *ssl, unsigned char type, int32 len, unsigned char *c)
 {
 	*c = type; c++;
 	*c = ssl->majVer; c++;
@@ -1031,8 +1121,8 @@ int psWriteRecordInfo(ssl_t *ssl, unsigned char type, int len, unsigned char *c)
 		3 bytes length (network byte order)
 	Returns the number of bytes written
 */
-int psWriteHandshakeHeader(ssl_t *ssl, unsigned char type, int len, 
-								int seq, int fragOffset, int fragLen,
+int32 psWriteHandshakeHeader(ssl_t *ssl, unsigned char type, int32 len, 
+								int32 seq, int32 fragOffset, int32 fragLen,
 								unsigned char *c)
 {
 	*c = type; c++;
@@ -1066,7 +1156,7 @@ int psWriteHandshakeHeader(ssl_t *ssl, unsigned char type, int len,
 	We calculate the length of padding required for a record using
 	sslPadLenPwr2()
 */
-static int sslWritePad(unsigned char *p, unsigned char padLen)
+static int32 sslWritePad(unsigned char *p, unsigned char padLen)
 {
 	unsigned char c = padLen;
 
@@ -1077,4 +1167,6 @@ static int sslWritePad(unsigned char *p, unsigned char padLen)
 }
 
 /******************************************************************************/
+
+
 

@@ -1,13 +1,13 @@
 /*
  *	matrixSsl.h
- *	Release $Name: MATRIXSSL_1_2_2_OPEN $
+ *	Release $Name: MATRIXSSL_1_2_4_OPEN $
  *	
  *	Public header file for MatrixSSL
  *	Implementations interacting with the matrixssl library should
  *	only use the APIs and definitions used in this file.
  */
 /*
- *	Copyright (c) PeerSec Networks, 2002-2004. All Rights Reserved.
+ *	Copyright (c) PeerSec Networks, 2002-2005. All Rights Reserved.
  *	The latest version of this code is available at http://www.matrixssl.org
  *
  *	This software is open source; you can redistribute it and/or modify
@@ -34,6 +34,24 @@
 #ifndef _h_MATRIXSSL
 #define _h_MATRIXSSL
 
+ /* #ifdef __cplusplus
+ */  /* extern "C" {
+ */  /* #endif
+ */ 
+
+/******************************************************************************/
+/*
+	Platform integer sizes.  Must match values in osLayer.h
+*/
+#ifndef MATRIX_INT32
+#define MATRIX_INT32
+typedef int int32;
+#endif
+
+#ifndef MATRIX_UINT32
+#define MATRIX_UINT32
+typedef unsigned int uint32;
+#endif
 
 /******************************************************************************/
 /*
@@ -55,6 +73,7 @@
 #define		SSL_PROCESS_DATA	-5	/* succesfully decoded application data */
 #define		SSL_ALERT			-6	/* we've decoded an alert */
 #define		SSL_FILE_NOT_FOUND	-7	/* File not found */
+#define		SSL_MEM_ERROR		-8	/* Memory allocation failure */
 
 /*
 	SSL Alert levels and descriptions
@@ -80,7 +99,7 @@
 /*
 	Typdefs required for public apis.  From an end user perspective, the 
 	sslBuf_t and sslCertInfo_t types have internal fields that are public,
-	but ssl_t, sslKeys_t, and sslSessionId_t do not.  Defining those as 'int'
+	but ssl_t, sslKeys_t, and sslSessionId_t do not.  Defining those as 'int32'
 	requires it to be treated as an opaque data type to be passed to public apis
 */
 #ifndef _h_MATRIXINTERNAL
@@ -88,7 +107,7 @@ typedef struct {
 	unsigned char	*buf;	/* Pointer to the start of the buffer */
 	unsigned char	*start;	/* Pointer to start of valid data */
 	unsigned char	*end;	/* Pointer to first byte of invalid data */
-	int				size;	/* Size of buffer in bytes */
+	int32			size;	/* Size of buffer in bytes */
 } sslBuf_t;
 
 /*
@@ -111,27 +130,28 @@ typedef struct {
 } sslSubjectAltName_t;
 
 typedef struct sslCertInfo {
-	int						verified;
+	int32					verified;
 	unsigned char			*serialNumber;
-	int						serialNumberLen;
+	int32						serialNumberLen;
 	char					*notBefore;
 	char					*notAfter;
 	char					*sigHash;
-	int						sigHashLen;
+	int32					sigHashLen;
 	sslSubjectAltName_t		subjectAltName;
 	sslDistinguishedName_t	subject;
 	sslDistinguishedName_t	issuer;
 	struct sslCertInfo		*next;
 } sslCertInfo_t;
 
-typedef int		ssl_t;
-typedef int		sslKeys_t;
-typedef int		sslSessionId_t;
+typedef int32		ssl_t;
+typedef int32		sslKeys_t;
+typedef int32		sslSessionId_t;
 
 /*
 	Flag indicating server session in matrixSslNewSession
 */
 #define	SSL_FLAGS_SERVER		0x1
+#define SSL_FLAGS_CLIENT_AUTH	0x200
 
 #define	SSL_OPTION_DELETE_SESSION		0
 
@@ -141,13 +161,13 @@ typedef int		sslSessionId_t;
 	internal header, we export them instead!
 */
 #ifdef WIN32
-#define SSLPUBLIC extern
-/* __declspec(dllimport) */
+#define SSLPUBLIC extern /*  __declspec(dllimport)
+ */ 
 #endif /* WIN */
 #else /* _h_MATRIXINTERNAL */
 #ifdef WIN32
-#define SSLPUBLIC extern
-/*__declspec(dllexport) */
+#define SSLPUBLIC extern /*  __declspec(dllexport)
+ */ 
 #endif /* WIN */
 #endif /* _h_MATRIXINTERNAL */
 #ifndef WIN32
@@ -158,49 +178,59 @@ typedef int		sslSessionId_t;
 /*
  *	Public API set
  */
-SSLPUBLIC int	matrixSslOpen();
+SSLPUBLIC int32	matrixSslOpen();
 SSLPUBLIC void	matrixSslClose();
 
-SSLPUBLIC int	matrixSslReadKeys(sslKeys_t **keys, char *certFile,
+SSLPUBLIC int32	matrixSslReadKeys(sslKeys_t **keys, char *certFile,
 						char *privFile, char *privPass, char *trustedCAFile);
 SSLPUBLIC void	matrixSslFreeKeys(sslKeys_t *keys);
 
-SSLPUBLIC int	matrixSslNewSession(ssl_t **ssl, sslKeys_t *keys,
-						sslSessionId_t *session, int flags);
+SSLPUBLIC int32	matrixSslNewSession(ssl_t **ssl, sslKeys_t *keys,
+						sslSessionId_t *session, int32 flags);
 SSLPUBLIC void	matrixSslDeleteSession(ssl_t *ssl);
 
-SSLPUBLIC int	matrixSslDecode(ssl_t *ssl, sslBuf_t *in, sslBuf_t *out, 
+SSLPUBLIC int32	matrixSslDecode(ssl_t *ssl, sslBuf_t *in, sslBuf_t *out, 
 						unsigned char *error, unsigned char *alertLevel,
 						unsigned char *alertDescription);
-SSLPUBLIC int	matrixSslEncode(ssl_t *ssl, unsigned char *in, int inlen,
+SSLPUBLIC int32	matrixSslEncode(ssl_t *ssl, unsigned char *in, int32 inlen,
 						sslBuf_t *out);
-SSLPUBLIC int	matrixSslEncodeClosureAlert(ssl_t *ssl, sslBuf_t *out);
+SSLPUBLIC int32	matrixSslEncodeClosureAlert(ssl_t *ssl, sslBuf_t *out);
 
-SSLPUBLIC int	matrixSslHandshakeIsComplete(ssl_t *ssl);
+SSLPUBLIC int32	matrixSslHandshakeIsComplete(ssl_t *ssl);
 
 SSLPUBLIC void	matrixSslSetCertValidator(ssl_t *ssl,
-					int (*certValidator)(sslCertInfo_t *, void *arg),
+					int32 (*certValidator)(sslCertInfo_t *, void *arg),
 					void *arg);
 
-SSLPUBLIC void	matrixSslSetSessionOption(ssl_t *ssl, int option, void *arg);
+SSLPUBLIC void	matrixSslSetSessionOption(ssl_t *ssl, int32 option, void *arg);
 
 /*
 	Client side APIs
 */
-SSLPUBLIC int	matrixSslEncodeClientHello(ssl_t *ssl, sslBuf_t *out,
+SSLPUBLIC int32	matrixSslEncodeClientHello(ssl_t *ssl, sslBuf_t *out,
 						unsigned short cipherSpec);
 
-SSLPUBLIC int	matrixSslGetSessionId(ssl_t *ssl, sslSessionId_t **sessionId);
+SSLPUBLIC int32	matrixSslGetSessionId(ssl_t *ssl, sslSessionId_t **sessionId);
 SSLPUBLIC void	matrixSslFreeSessionId(sslSessionId_t *sessionId);
 
 /*
 	Server side APIs
 */
-SSLPUBLIC int matrixSslEncodeHelloRequest(ssl_t *ssl, sslBuf_t *out);
+SSLPUBLIC int32 matrixSslEncodeHelloRequest(ssl_t *ssl, sslBuf_t *out);
+
+
+SSLPUBLIC int32 matrixSslReadKeysMem(sslKeys_t **keys, char *certBuf, int32 certLen, 
+								char *privBuf, int32 privLen, char *privPass,
+								char *trustedCABuf, int32 trustedCALen);
 
 /******************************************************************************/
 
+ /* #ifdef __cplusplus
+ */  /* }
+ */  /* #endif
+ */ 
 
 #endif /* _h_MATRIXSSL */
 
 /******************************************************************************/
+

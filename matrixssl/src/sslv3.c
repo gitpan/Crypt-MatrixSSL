@@ -1,13 +1,13 @@
 /*
  *	sslv3.c
- *	Release $Name: MATRIXSSL_1_2_2_OPEN $
+ *	Release $Name: MATRIXSSL_1_2_4_OPEN $
  *
  *	SSLv3.0 specific code per http://wp.netscape.com/eng/ssl3.
  *	Primarily dealing with secret generation, message authentication codes
  *	and handshake hashing.
  */
 /*
- *	Copyright (c) PeerSec Networks, 2002-2004. All Rights Reserved.
+ *	Copyright (c) PeerSec Networks, 2002-2005. All Rights Reserved.
  *	The latest version of this code is available at http://www.matrixssl.org
  *
  *	This software is open source; you can redistribute it and/or modify
@@ -73,21 +73,21 @@ static const unsigned char *salt[10]={
 
 /******************************************************************************/
 
-static int createKeyBlock(ssl_t *ssl, unsigned char *clientRandom,
+static int32 createKeyBlock(ssl_t *ssl, unsigned char *clientRandom,
 						  unsigned char *serverRandom, 
-						  unsigned char *masterSecret, int secretLen);
+						  unsigned char *masterSecret, int32 secretLen);
 
 /******************************************************************************/
 /*
  *	Generates all key material.
  */
-int sslDeriveKeys(ssl_t *ssl)
+int32 sslDeriveKeys(ssl_t *ssl)
 {
 	sslMd5Context_t		md5Ctx;
 	sslSha1Context_t	sha1Ctx;
 	unsigned char		buf[SSL_MD5_HASH_SIZE + SSL_SHA1_HASH_SIZE];
-	unsigned char		*tmp, *tmp2;
-	int					i;
+	unsigned char		*tmp;
+	int32				i;
 
 /*
 	If this session is resumed, we want to reuse the master secret to 
@@ -105,7 +105,7 @@ int sslDeriveKeys(ssl_t *ssl)
 		MD5(pre_master_secret + SHA('CCC' + pre_master_secret +
 			ClientHello.random + ServerHello.random));
 */
-	tmp = tmp2 = psMalloc(SSL_HS_PREMASTER_SIZE);
+	tmp = ssl->sec.masterSecret;
 	for (i = 0; i < 3; i++) {
 		matrixSha1Init(&sha1Ctx);
 		matrixSha1Update(&sha1Ctx, salt[i], i + 1);
@@ -120,8 +120,6 @@ int sslDeriveKeys(ssl_t *ssl)
 		matrixMd5Final(&md5Ctx, tmp);
 		tmp += SSL_MD5_HASH_SIZE;
 	}
-	memcpy(ssl->sec.masterSecret, tmp2, SSL_HS_PREMASTER_SIZE);
-	psFree(tmp2);
 	memset(buf, 0x0, SSL_MD5_HASH_SIZE + SSL_SHA1_HASH_SIZE);
 
 skipPremaster:
@@ -146,16 +144,16 @@ skipPremaster:
 			ServerHello.random + ClientHello.random)) + 
 		[...];
 */
-static int createKeyBlock(ssl_t *ssl, unsigned char *clientRandom,
+static int32 createKeyBlock(ssl_t *ssl, unsigned char *clientRandom,
 						  unsigned char *serverRandom,
-						  unsigned char *masterSecret, int secretLen)
+						  unsigned char *masterSecret, int32 secretLen)
 {
 	sslMd5Context_t		md5Ctx;
 	sslSha1Context_t	sha1Ctx;
-	unsigned char	buf[SSL_MD5_HASH_SIZE + SSL_SHA1_HASH_SIZE];
-	unsigned char	*tmp;
-	int				keyIter, i, ret = 0;
-	int				reqKeyLen;
+	unsigned char		buf[SSL_MD5_HASH_SIZE + SSL_SHA1_HASH_SIZE];
+	unsigned char		*tmp;
+	int32				keyIter, i, ret = 0;
+	int32				reqKeyLen;
 
 /*
 	We must generate enough key material to fill the various keys
@@ -176,7 +174,6 @@ static int createKeyBlock(ssl_t *ssl, unsigned char *clientRandom,
 		return -1;
 	}
 
-	ssl->sec.keyBlock = psMalloc(SSL_MD5_HASH_SIZE * keyIter);
 	tmp = ssl->sec.keyBlock;
 	for (i = 0; i < keyIter; i++) {
 		matrixSha1Init(&sha1Ctx);
@@ -223,9 +220,9 @@ static int createKeyBlock(ssl_t *ssl, unsigned char *clientRandom,
 	and mix them up a bit more.  Output the result to the given buffer.
 	This data will be part of the Finished handshake message.
 */
-int sslGenerateFinishedHash(sslMd5Context_t *md5, sslSha1Context_t *sha1, 
+int32 sslGenerateFinishedHash(sslMd5Context_t *md5, sslSha1Context_t *sha1, 
 								unsigned char *masterSecret,
-								unsigned char *out, int sender)
+								unsigned char *out, int32 sender)
 {
 	sslMd5Context_t			omd5;
 	sslSha1Context_t		osha1;
@@ -281,13 +278,13 @@ int sslGenerateFinishedHash(sslMd5Context_t *md5, sslSha1Context_t *sha1,
 	SHA1(MAC_write_secret + pad2 + 
 		SHA1(MAC_write_secret + pad1 + seq_num + length + content));
 */
-int ssl3HMACSha1(unsigned char *key, unsigned char *seq, 
-						unsigned char type, unsigned char *data, int len,
+int32 ssl3HMACSha1(unsigned char *key, unsigned char *seq, 
+						unsigned char type, unsigned char *data, int32 len,
 						unsigned char *mac)
 {
 	sslSha1Context_t	sha1;
 	unsigned char		ihash[SSL_SHA1_HASH_SIZE];
-	int					i;
+	int32				i;
 
 	matrixSha1Init(&sha1);
 	matrixSha1Update(&sha1, key, SSL_SHA1_HASH_SIZE);
@@ -328,13 +325,13 @@ int ssl3HMACSha1(unsigned char *key, unsigned char *seq,
 	MD5(MAC_write_secret + pad2 + 
 		MD5(MAC_write_secret + pad1 + seq_num + length + content));
 */
-int ssl3HMACMd5(unsigned char *key, unsigned char *seq, 
-						unsigned char type, unsigned char *data, int len,
+int32 ssl3HMACMd5(unsigned char *key, unsigned char *seq, 
+						unsigned char type, unsigned char *data, int32 len,
 						unsigned char *mac)
 {
 	sslMd5Context_t		md5;
 	unsigned char		ihash[SSL_MD5_HASH_SIZE];
-	int					i;
+	int32				i;
 
 	matrixMd5Init(&md5);
 	matrixMd5Update(&md5, key, SSL_MD5_HASH_SIZE);

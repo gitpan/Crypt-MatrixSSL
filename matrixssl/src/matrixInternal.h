@@ -1,12 +1,12 @@
 /*
  *	matrixInternal.h
- *	Release $Name: MATRIXSSL_1_2_2_OPEN $
+ *	Release $Name: MATRIXSSL_1_2_4_OPEN $
  *
  *	Internal header file used for the MatrixSSL implementation.
  *	Only modifiers of the library should be intersted in this file
  */
 /*
- *	Copyright (c) PeerSec Networks, 2002-2004. All Rights Reserved.
+ *	Copyright (c) PeerSec Networks, 2002-2005. All Rights Reserved.
  *	The latest version of this code is available at http://www.matrixssl.org
  *
  *	This software is open source; you can redistribute it and/or modify
@@ -33,11 +33,16 @@
 #ifndef _h_MATRIXINTERNAL
 #define _h_MATRIXINTERNAL
 
+/******************************************************************************/
 /*
 	Include the configuration header to define the features we're using
 */
 #include "matrixConfig.h"
 
+/******************************************************************************/
+/*
+	The top level source relies on the os and crypto layers.  Include them
+*/
 #include "os/osLayer.h"
 #include "crypto/cryptoLayer.h"
 
@@ -60,6 +65,7 @@ extern "C" {
 #define SSL_FLAGS_CLOSED		0x20
 #define SSL_FLAGS_NEED_ENCODE	0x40
 #define SSL_FLAGS_ERROR			0x80
+#define SSL_FLAGS_CLIENT_AUTH	0x200	/* Must match value in matrixSsl.h */
 	
 /*
 	matrixSslSetSessionOption defines
@@ -72,7 +78,7 @@ extern "C" {
 
 /*
 	These are defines rather than enums because we want to store them as char,
-	not int (enum size)
+	not int32 (enum size)
 */
 #define SSL_RECORD_TYPE_CHANGE_CIPHER_SPEC	20
 #define SSL_RECORD_TYPE_ALERT				21
@@ -121,6 +127,14 @@ extern "C" {
 #define SSL_RSA_WITH_3DES_EDE_CBC_SHA	0x000A
 
 /*
+	Maximum key block size for any defined cipher
+	This must be validated if new ciphers are added
+	Value is largest total among all cipher suites for
+		2*macSize + 2*keySize + 2*ivSize
+*/
+#define SSL_MAX_KEY_BLOCK_SIZE			2*20 + 2*24 + 2*8
+
+/*
 	Master secret is 48 bytes, sessionId is 32 bytes max
 */
 #define		SSL_HS_MASTER_SIZE		48
@@ -133,8 +147,6 @@ extern "C" {
 	that are powers of 2.
 	Because of the trailing pad length byte, a length that is a multiple
 	of the pad bytes
-	FUTURE TLS - Could support random length additions to the pad to obfuscate
-	true pad length.
 */
 #define sslPadLenPwr2(LEN, BLOCKSIZE) \
 	BLOCKSIZE <= 1 ? (unsigned char)0 : \
@@ -155,32 +167,11 @@ extern "C" {
 #endif
 
 /******************************************************************************/
-#if FUTURE
-/*
-	Buffer arithmetic
-*/
-#define BUFLEN(B)			(int)(B.end - B.start)
-#define BUFREMAINING(B)		(int)((B.buf + B.size) - B.end)
-/*
-	Buffer conditionals
-*/
-#define BUFHASDATA(B)		(B.start < B.end)
-#define BUFHASROOM(B, L)	(BUFREMAINING(B) >= L)
-/*
-	Buffer actions
-*/
-#define BUFALLOC(B, L)		B.buf = psMalloc(L); B.size = L; BUFRESET(B);
-#define BUFFREE(B)			free(B.buf); B.buf = B.start = B.end = NULL;
-#define BUFRESET(B)			(B.start = B.end = B.buf);
-#define BUFPACK(B)			if (B.start > B.buf) { \
-								if (BUFHASDATA(B)) { \
-									memmove(B.buf, B.start, BUFLEN(B));\
-								} \
-								BUFRESET(B); \
-							}
-#endif
-/******************************************************************************/
 
+/******************************************************************************/
+/*
+	Buffer structure
+*/
 #ifndef sslBuf_t
 /*
 	Empty buffer:
@@ -211,10 +202,14 @@ typedef struct {
 	unsigned char	*buf;	/* Pointer to the start of the buffer */
 	unsigned char	*start;	/* Pointer to start of valid data */
 	unsigned char	*end;	/* Pointer to first byte of invalid data */
-	int		size;			/* Size of buffer in bytes */
+	int32		size;			/* Size of buffer in bytes */
 } sslBuf_t;
 #endif
 
+/******************************************************************************/
+/*
+	SSL record and session structures
+*/
 typedef struct {
 	unsigned short	len;
 	unsigned char	majVer;
@@ -229,7 +224,7 @@ typedef struct {
 	unsigned char	premaster[SSL_HS_PREMASTER_SIZE];	/* From ClientKeyExchange */
 	unsigned char	masterSecret[SSL_HS_MASTER_SIZE];
 
-	unsigned char	*keyBlock;	/* Storage for the next six items */
+	unsigned char	keyBlock[SSL_MAX_KEY_BLOCK_SIZE];	/* Storage for the next six items */
 	unsigned char	*wMACptr;
 	unsigned char	*rMACptr;
 	unsigned char	*wKeyptr;
@@ -250,8 +245,9 @@ typedef struct {
 
 #ifdef USE_CLIENT_SIDE_SSL
 	sslRsaCert_t	*cert;
-	int (*validateCert)(sslCertInfo_t *certInfo, void *arg);
+	int32 (*validateCert)(sslCertInfo_t *certInfo, void *arg);
 	void			*validateCertArg;
+	int32			certMatch;
 #endif /* USE_CLIENT_SIDE_SSL */
 
 	sslMd5Context_t		msgHashMd5;
@@ -262,34 +258,34 @@ typedef struct {
 } sslSec_t;
 
 typedef struct {
-	unsigned int	id;
+	uint32	id;
 	unsigned char	macSize;
 	unsigned char	keySize;
 	unsigned char	ivSize;
 	unsigned char	blockSize;
 	/* Init function */
-	int (*init)(sslSec_t *sec, int type);
+	int32 (*init)(sslSec_t *sec, int32 type);
 	/* Cipher functions */
-	int (*encrypt)(sslCipherContext_t *ctx, unsigned char *in,
-		unsigned char *out, int len);
-	int (*decrypt)(sslCipherContext_t *ctx, unsigned char *in,
-		unsigned char *out, int len);
-	int (*encryptPub)(sslRsaKey_t *key, unsigned char *in, int inlen,
-		unsigned char *out, 
-		int outlen);
-	int (*decryptPriv)(sslRsaKey_t *key, unsigned char *in, int inlen,
-		unsigned char *out, 
-		int outlen);
-	int (*generateMac)(void *ssl, unsigned char type, unsigned char *data,
-		int len, unsigned char *mac);
-	int (*verifyMac)(void *ssl, unsigned char type, unsigned char *data,
-		int len, unsigned char *mac);
+	int32 (*encrypt)(sslCipherContext_t *ctx, unsigned char *in,
+		unsigned char *out, int32 len);
+	int32 (*decrypt)(sslCipherContext_t *ctx, unsigned char *in,
+		unsigned char *out, int32 len);
+	int32 (*encryptPub)(psPool_t *pool, sslRsaKey_t *key, 
+		unsigned char *in, int32 inlen,
+		unsigned char *out, int32 outlen);
+	int32 (*decryptPriv)(psPool_t *pool, sslRsaKey_t *key, 
+		unsigned char *in, int32 inlen,
+		unsigned char *out, int32 outlen);
+	int32 (*generateMac)(void *ssl, unsigned char type, unsigned char *data,
+		int32 len, unsigned char *mac);
+	int32 (*verifyMac)(void *ssl, unsigned char type, unsigned char *data,
+		int32 len, unsigned char *mac);
 } sslCipherSpec_t;
 
 typedef struct sslLocalCert {
 	sslRsaKey_t			*privKey;
 	unsigned char		*certBin;
-	unsigned int		certLen;
+	uint32		certLen;
 	struct sslLocalCert	*next;
 } sslLocalCert_t;
 
@@ -307,6 +303,9 @@ typedef struct ssl {
 
 	sslKeys_t		*keys;			/* SSL public and private keys */
 
+	psPool_t		*pool;			/* SSL session pool */
+	psPool_t		*hsPool;		/* Full session handshake pool */
+
 	unsigned char	sessionIdLen;
 	char			sessionId[SSL_MAX_SESSION_ID_SIZE];
 
@@ -320,20 +319,22 @@ typedef struct ssl {
 		Also, there are 64 bit alignment issues in using the function pointers
 		within 'cipher' directly
 	*/
-	int (*encrypt)(sslCipherContext_t *ctx, unsigned char *in,
-		unsigned char *out, int len);
-	int (*decrypt)(sslCipherContext_t *ctx, unsigned char *in,
-		unsigned char *out, int len);
+	int32 (*encrypt)(sslCipherContext_t *ctx, unsigned char *in,
+		unsigned char *out, int32 len);
+	int32 (*decrypt)(sslCipherContext_t *ctx, unsigned char *in,
+		unsigned char *out, int32 len);
 	/* Public key ciphers */
-	int (*encryptPub)(sslRsaKey_t *key, unsigned char *in, int inlen,
-		unsigned char *out, int outlen);
-	int (*decryptPriv)(sslRsaKey_t *key, unsigned char *in, int inlen,
-		unsigned char *out, int outlen);
+	int32 (*encryptPub)(psPool_t *pool, sslRsaKey_t *key, 
+		unsigned char *in, int32 inlen,
+		unsigned char *out, int32 outlen);
+	int32 (*decryptPriv)(psPool_t *pool, sslRsaKey_t *key, 
+		unsigned char *in, int32 inlen,
+		unsigned char *out, int32 outlen);
 	/* Message Authentication Codes */
-	int (*generateMac)(void *ssl, unsigned char type, unsigned char *data,
-		int len, unsigned char *mac);
-	int (*verifyMac)(void *ssl, unsigned char type, unsigned char *data,
-		int len, unsigned char *mac);
+	int32 (*generateMac)(void *ssl, unsigned char type, unsigned char *data,
+		int32 len, unsigned char *mac);
+	int32 (*verifyMac)(void *ssl, unsigned char type, unsigned char *data,
+		int32 len, unsigned char *mac);
 
 	/* Current encryption/decryption parameters */
 	unsigned char	enMacSize;
@@ -343,23 +344,23 @@ typedef struct ssl {
 	unsigned char	deIvSize;
 	unsigned char	deBlockSize;
 
-	int				flags;
-	int				hsState;		/* Next expected handshake message type */
-	int				err;			/* SSL errno of last api call */
-	int				ignoredMessageCount;
+	int32				flags;
+	int32				hsState;		/* Next expected handshake message type */
+	int32				err;			/* SSL errno of last api call */
+	int32				ignoredMessageCount;
 
 	unsigned char	reqMajVer;
 	unsigned char	reqMinVer;
 	unsigned char	majVer;
 	unsigned char	minVer;
-	int				recordHeadLen;
-	int				hshakeHeadLen;
+	int32				recordHeadLen;
+	int32				hshakeHeadLen;
 } ssl_t;
 
 typedef struct {
 	unsigned char	id[SSL_MAX_SESSION_ID_SIZE];
 	unsigned char	masterSecret[SSL_HS_MASTER_SIZE];
-	unsigned int	cipherId;
+	uint32	cipherId;
 } sslSessionId_t;
 
 typedef struct {
@@ -370,7 +371,7 @@ typedef struct {
 	unsigned char	minVer;
 	sslTime_t		startTime;
 	sslTime_t		accessTime;
-	int				inUse;
+	int32				inUse;
 } sslSessionEntry_t;
 
 /*
@@ -385,62 +386,62 @@ typedef struct {
 /*
 	No file system
 */
-extern int matrixSslReadKeysMem(sslKeys_t **keys, char *certBuf, int certLen, 
-								char *privBuf, int privLen, char *privPass,
-								char *trustedCABuf, int trustedCALen);
+extern int32 matrixSslReadKeysMem(sslKeys_t **keys, char *certBuf, int32 certLen, 
+								char *privBuf, int32 privLen, char *privPass,
+								char *trustedCABuf, int32 trustedCALen);
 /******************************************************************************/
 /*
 	sslEncode.c and sslDecode.c
 */
-extern int psWriteRecordInfo(ssl_t *ssl, unsigned char type, int len,
+extern int32 psWriteRecordInfo(ssl_t *ssl, unsigned char type, int32 len,
 							 unsigned char *c);
-extern int psWriteHandshakeHeader(ssl_t *ssl, unsigned char type, int len, 
-								int seq, int fragOffset, int fragLen,
+extern int32 psWriteHandshakeHeader(ssl_t *ssl, unsigned char type, int32 len, 
+								int32 seq, int32 fragOffset, int32 fragLen,
 								unsigned char *c);
-extern int sslEncodeResponse(ssl_t *ssl, sslBuf_t *out);
-extern int sslActivateReadCipher(ssl_t *ssl);
-extern int sslActivateWriteCipher(ssl_t *ssl);
-extern int sslActivatePublicCipher(ssl_t *ssl);
-extern int sslUpdateHSHash(ssl_t *ssl, unsigned char *in, int len);
-extern int sslInitHSHash(ssl_t *ssl);
-extern int sslSnapshotHSHash(ssl_t *ssl, unsigned char *out, int senderFlag);
+extern int32 sslEncodeResponse(ssl_t *ssl, sslBuf_t *out);
+extern int32 sslActivateReadCipher(ssl_t *ssl);
+extern int32 sslActivateWriteCipher(ssl_t *ssl);
+extern int32 sslActivatePublicCipher(ssl_t *ssl);
+extern int32 sslUpdateHSHash(ssl_t *ssl, unsigned char *in, int32 len);
+extern int32 sslInitHSHash(ssl_t *ssl);
+extern int32 sslSnapshotHSHash(ssl_t *ssl, unsigned char *out, int32 senderFlag);
 
 extern void sslResetContext(ssl_t *ssl);
 
 #ifdef USE_SERVER_SIDE_SSL
-extern int matrixRegisterSession(ssl_t *ssl);
-extern int matrixResumeSession(ssl_t *ssl);
-extern int matrixClearSession(ssl_t *ssl, int remove);
-extern int matrixUpdateSession(ssl_t *ssl);
+extern int32 matrixRegisterSession(ssl_t *ssl);
+extern int32 matrixResumeSession(ssl_t *ssl);
+extern int32 matrixClearSession(ssl_t *ssl, int32 remove);
+extern int32 matrixUpdateSession(ssl_t *ssl);
 #endif /* USE_SERVER_SIDE_SSL */
 
 
 /*
 	cipherSuite.c
 */
-extern sslCipherSpec_t *sslGetCipherSpec(int id);
-extern int sslGetCipherSpecListLen();
-extern int sslGetCipherSpecList(unsigned char *c, int len);
+extern sslCipherSpec_t *sslGetCipherSpec(int32 id);
+extern int32 sslGetCipherSpecListLen();
+extern int32 sslGetCipherSpecList(unsigned char *c, int32 len);
 
 /******************************************************************************/
 /*
 	sslv3.c
 */
-extern int sslGenerateFinishedHash(sslMd5Context_t *md5, sslSha1Context_t *sha1,
+extern int32 sslGenerateFinishedHash(sslMd5Context_t *md5, sslSha1Context_t *sha1,
 								unsigned char *masterSecret,
-								unsigned char *out, int sender);
+								unsigned char *out, int32 sender);
 
-extern int sslDeriveKeys(ssl_t *ssl);
+extern int32 sslDeriveKeys(ssl_t *ssl);
 
 #ifdef USE_SHA1_MAC
-extern int ssl3HMACSha1(unsigned char *key, unsigned char *seq, 
-						unsigned char type, unsigned char *data, int len,
+extern int32 ssl3HMACSha1(unsigned char *key, unsigned char *seq, 
+						unsigned char type, unsigned char *data, int32 len,
 						unsigned char *mac);
 #endif /* USE_SHA1_MAC */
 
 #ifdef USE_MD5_MAC
-extern int ssl3HMACMd5(unsigned char *key, unsigned char *seq, 
-						unsigned char type, unsigned char *data, int len,
+extern int32 ssl3HMACMd5(unsigned char *key, unsigned char *seq, 
+						unsigned char type, unsigned char *data, int32 len,
 						unsigned char *mac);
 #endif /* USE_MD5_MAC */
 

@@ -1,11 +1,11 @@
 /*
  *	pscrypto.h
- *	Release $Name: MATRIXSSL_1_2_2_OPEN $
+ *	Release $Name: MATRIXSSL_1_2_4_OPEN $
  *
  *	Internal definitions for PeerSec Networks MatrixSSL cryptography provider
  */
 /*
- *	Copyright (c) PeerSec Networks, 2002-2004. All Rights Reserved.
+ *	Copyright (c) PeerSec Networks, 2002-2005. All Rights Reserved.
  *	The latest version of this code is available at http://www.matrixssl.org
  *
  *	This software is open source; you can redistribute it and/or modify
@@ -55,6 +55,7 @@ extern "C" {
 /******************************************************************************/
 
 #ifdef USE_RSA
+
 #include "mpi.h"
 
 #if LINUX
@@ -74,9 +75,9 @@ typedef unsigned long ulong32;
 #define OID_RSA_SHA1	649
 
 typedef struct {
-	mp_int	e, d, N, qP, pQ, dP, dQ, p, q;
-	int		size;	/* Size of the key in bytes */
-	int		optimized; /* 1 for optimized */
+	mp_int		e, d, N, qP, pQ, dP, dQ, p, q;
+	int32			size;	/* Size of the key in bytes */
+	int32			optimized; /* 1 for optimized */
 } sslRsaKey_t;
 
 /* typedef rsa_key sslRsaKey_t; */
@@ -118,7 +119,8 @@ enum {
 /*
  *	APIs
  */
-extern int psAsnParsePrivateKey(unsigned char **pp, int size, sslRsaKey_t *key);
+extern int32 psAsnParsePrivateKey(psPool_t *pool, unsigned char **pp, int32 size, 
+								sslRsaKey_t *key);
 
 #ifdef USE_X509
 
@@ -133,8 +135,8 @@ typedef struct {
 } DNattributes_t;
 
 typedef struct {
-	int	ca;
-	int	pathLenConstraint;
+	int32	ca;
+	int32	pathLenConstraint;
 } extBasicConstraints_t;
 
 typedef struct {
@@ -144,15 +146,15 @@ typedef struct {
 } extSubjectAltName_t;
 
 typedef struct {
-	int				len;
+	int32				len;
 	unsigned char	*id;
 } extSubjectKeyId_t;
 
 typedef struct {
-	int				keyLen;
+	int32				keyLen;
 	unsigned char	*keyId;
 	DNattributes_t	attribs;
-	int				serialNum;
+	int32				serialNum;
 } extAuthKeyId_t;
 /*
 	FUTURE:  add support for the other extensions
@@ -163,45 +165,44 @@ typedef struct {
 #ifdef USE_FULL_CERT_PARSE
 	extSubjectKeyId_t		sk;
 	extAuthKeyId_t			ak;
-	char					keyUsage;
+	unsigned char			keyUsage;
 #endif /* USE_FULL_CERT_PARSE */
 } v3extensions_t;
 
 typedef struct sslRsaCert {
-	int				version;
-	int				valid;
+	int32				version;
+	int32				valid;
 	unsigned char	*serialNumber;
-	int				serialNumberLen;
+	int32				serialNumberLen;
 	DNattributes_t	issuer;
 	DNattributes_t	subject;
 	char			*notBefore;
 	char			*notAfter;
 	sslRsaKey_t		publicKey;
-	int				certAlgorithm;
-	int				sigAlgorithm;
-	int				pubKeyAlgorithm;
+	int32				certAlgorithm;
+	int32				sigAlgorithm;
+	int32				pubKeyAlgorithm;
 	unsigned char	*signature;
-	int				signatureLen;
+	int32				signatureLen;
 	unsigned char	sigHash[SSL_SHA1_HASH_SIZE];
 	unsigned char	*uniqueUserId;
-	int				uniqueUserIdLen;
+	int32				uniqueUserIdLen;
 	unsigned char	*uniqueSubjectId;
-	int				uniqueSubjectIdLen;
+	int32				uniqueSubjectIdLen;
 	v3extensions_t	extensions;
 	struct sslRsaCert	*next;
 } sslRsaCert_t;
 
-
-extern int psAsnConfirmSignature(sslRsaCert_t *subjectCert,
-						unsigned char *sigOut, int sigLen);
+extern int32 psAsnConfirmSignature(char *sigHash, unsigned char *sigOut,
+								 int32 sigLen);
 #endif /* USE_X509 */
 #endif /* USE_RSA */
 
 /*
  *	Private
  */
-extern int ps_base64_decode(const unsigned char *in,  unsigned int len, 
-							unsigned char *out, unsigned int *outlen);
+extern int32 ps_base64_decode(const unsigned char *in, uint32 len, 
+							unsigned char *out, uint32 *outlen);
 
 /*
  *	Memory routines
@@ -304,10 +305,10 @@ typedef hash_state sslMd2Context_t;
  */
 #ifdef USE_ARC4
 typedef struct {
-	unsigned char state[256];
-	unsigned int byteCount;
-	unsigned char x;
-	unsigned char y;
+	unsigned char	state[256];
+	uint32	byteCount;
+	unsigned char	x;
+	unsigned char	y;
 } rc4_key;
 #endif /* USE_ARC4 */
 
@@ -323,30 +324,30 @@ typedef struct {
 	A block cipher CBC structure
  */
 typedef struct {
-	int					blocklen;
+	int32					blocklen;
 	unsigned char		IV[8];
 	des3_key			key;
-	int					explicitIV; /* 1 if yes */
+	int32					explicitIV; /* 1 if yes */
 } des3_CBC;
 
-extern int des3_setup(const unsigned char *key, int keylen, int num_rounds,
+extern int32 des3_setup(const unsigned char *key, int32 keylen, int32 num_rounds,
 		 des3_CBC *skey);
 extern void des3_ecb_encrypt(const unsigned char *pt, unsigned char *ct,
 		 des3_CBC *key);
 extern void des3_ecb_decrypt(const unsigned char *ct, unsigned char *pt,
 		 des3_CBC *key);
-extern int des3_keysize(int *desired_keysize);
+extern int32 des3_keysize(int32 *desired_keysize);
 
 #endif /* USE_3DES */
 
 #ifdef USE_AES
 typedef struct {
 	ulong32 eK[64], dK[64];
-	int Nr;
+	int32 Nr;
 } aes_key;
 
 typedef struct {
-	int				blocklen;
+	int32				blocklen;
 	unsigned char	IV[16];
 	aes_key			key;
 } aes_CBC;
@@ -615,7 +616,7 @@ typedef union {
 /*
 #elif defined(__GNUC__) && defined(__i386__)
 
-static inline unsigned long ROL(unsigned long word, int i)
+static inline unsigned long ROL(unsigned long word, int32 i)
 {
 	__asm__("roll %%cl,%0"
 		:"=r" (word)
@@ -623,7 +624,7 @@ static inline unsigned long ROL(unsigned long word, int i)
 	return word;
 }
 
-static inline unsigned long ROR(unsigned long word, int i)
+static inline unsigned long ROR(unsigned long word, int32 i)
 {
 	__asm__("rorl %%cl,%0"
 		:"=r" (word)

@@ -1,11 +1,11 @@
 /*
  *	rsa.c
- *	Release $Name: MATRIXSSL_1_2_2_OPEN $
+ *	Release $Name: MATRIXSSL_1_2_4_OPEN $
  *
  *	RSA key and cert reading, RSA padding and RSA math wrappers
  */
 /*
- *	Copyright (c) PeerSec Networks, 2002-2004. All Rights Reserved.
+ *	Copyright (c) PeerSec Networks, 2002-2005. All Rights Reserved.
  *	The latest version of this code is available at http://www.matrixssl.org
  *
  *	This software is open source; you can redistribute it and/or modify
@@ -39,28 +39,36 @@
 #endif /* WINCE */
 
 #include "../cryptoLayer.h"
-#include "../../os/osLayer.h"
 
 /******************************************************************************/
 
-static int ssl_rsa_crypt(const unsigned char *in,  unsigned int inlen,
-						unsigned char *out, unsigned int *outlen, 
-						sslRsaKey_t *key, int type);
+static int32 ssl_rsa_crypt(psPool_t *pool, 
+						const unsigned char *in, uint32 inlen,
+						unsigned char *out, uint32 *outlen, 
+						sslRsaKey_t *key, int32 type);
 
-static int sslUnpadRSA(unsigned char *in, int inlen, unsigned char *out, 
-						int outlen, int decryptType);
-static int sslPadRSA(unsigned char *in, int inlen, unsigned char *out,
-						int outlen, int cryptType);
+static int32 sslUnpadRSA(unsigned char *in, int32 inlen, unsigned char *out, 
+						int32 outlen, int32 decryptType);
+static int32 sslPadRSA(unsigned char *in, int32 inlen, unsigned char *out,
+						int32 outlen, int32 cryptType);
+
+#ifdef USE_X509
+static int32 matrixX509ValidateCertInternal(psPool_t *pool, 
+						sslRsaCert_t *subjectCert, 
+						sslRsaCert_t *issuerCert, int32 chain);
+#endif /* USE_X509 */
+
 #ifdef USE_3DES
-static int hexToBinary(unsigned char *hex, unsigned char *bin, int binlen);
-static void generate3DESKey(unsigned char *pass, int passlen, 
+static int32 hexToBinary(unsigned char *hex, unsigned char *bin, int32 binlen);
+static void generate3DESKey(unsigned char *pass, int32 passlen, 
 							unsigned char *salt, unsigned char *key);
 #endif /* USE_3DES */
 
 #ifdef USE_RSA_BLINDING
-static int tim_mp_exptmod(mp_int *c, mp_int *e, mp_int *d, mp_int *n, mp_int *m);
+static int32 tim_mp_exptmod(psPool_t *pool, 
+						mp_int *c, mp_int *e, mp_int *d, mp_int *n, mp_int *m);
 #else
-#define tim_mp_exptmod(c, e, d, n, m) mp_exptmod(c, d, n, m)
+#define tim_mp_exptmod(p, c, e, d, n, m) mp_exptmod(p, c, d, n, m)
 #endif
 
 /******************************************************************************/
@@ -75,9 +83,10 @@ static const char encryptHeader[] = "DEK-Info: DES-EDE3-CBC,";
 #ifdef USE_FILE_SYSTEM
 /******************************************************************************/
 /*
-	Return the file contents given a file name.  Caller must free bin
+	Return the file contents given a file name in a single allocated buffer.
+	Not a good routine to use generally with the fixed mem stuff.
 */
-static int getFileBin(char *fileName, unsigned char **bin, int *binLen)
+static int32 getFileBin(char *fileName, unsigned char **bin, int32 *binLen)
 {
 	FILE	*fp;
 	struct	stat	fstat;
@@ -94,10 +103,13 @@ static int getFileBin(char *fileName, unsigned char **bin, int *binLen)
 		return -7; /* FILE_NOT_FOUND */
 	}
 
-	*bin = psMalloc(fstat.st_size);
+	*bin = psMalloc(NULL, fstat.st_size);
+	if (*bin == NULL) {
+		return -8; /* SSL_MEM_ERROR */
+	}
 	while (((tmp = fread(*bin + *binLen, sizeof(char), 512, fp)) > 0) &&
 			(*binLen < fstat.st_size)) { 
-		*binLen += (int)tmp;
+		*binLen += (int32)tmp;
 	}
 	fclose(fp);
 	return 0;
@@ -108,12 +120,10 @@ static int getFileBin(char *fileName, unsigned char **bin, int *binLen)
  *	Public API to return a binary buffer from a cert.  Suitable to send
  *	over the wire.  Caller must free 'out' if this function returns success (0)
  *	Parse .pem files according to http://www.faqs.org/rfcs/rfc1421.html
- *	FUTURE - Support multiple certificates in a single file.
- *	FUTURE SECURITY - Make parsing of pem format more robust!
  */
-int matrixRsaReadCert(char *fileName, unsigned char **out, int *outLen)
+int32 matrixRsaReadCert(char *fileName, unsigned char **out, int32 *outLen)
 {
-	int				certBufLen, rc;
+	int32			certBufLen, rc;
 	unsigned char	*certBuf;
 
 	if (fileName == NULL) {
@@ -135,13 +145,12 @@ int matrixRsaReadCert(char *fileName, unsigned char **out, int *outLen)
  *	http://www.faqs.org/rfcs/rfc1421.html
  *
  *	If password is provided, we only deal with 3des cbc encryption
- *	Function allows allocates key on success.  User must free.
- *	FUTURE SECURITY - Make parsing of private key more robust!
+ *	Function allocates key on success.  User must free.
  */
-int matrixRsaReadPrivKey(char *fileName, char *password, sslRsaKey_t **key)
+int32 matrixRsaReadPrivKey(char *fileName, char *password, sslRsaKey_t **key)
 {
 	unsigned char	*keyBuf;
-	int				keyBufLen, rc;
+	int32			keyBufLen, rc;
 
 	if (fileName == NULL) {
 		return 0;
@@ -160,8 +169,8 @@ int matrixRsaReadPrivKey(char *fileName, char *password, sslRsaKey_t **key)
 /*
  *	In memory version of matrixRsaReadCert.
  */
-int matrixRsaReadCertMem(char *certBuf, int certLen, unsigned char **out,
-						 int *outLen)
+int32 matrixRsaReadCertMem(char *certBuf, int32 certLen, unsigned char **out,
+						 int32 *outLen)
 {
 	char	*start, *end;
 
@@ -173,11 +182,14 @@ int matrixRsaReadCertMem(char *certBuf, int certLen, unsigned char **out,
 		((start = strstr(certBuf, "CERTIFICATE-----")) != NULL) &&
 		(end = strstr(start, "-----END")) != NULL) {
 		start += strlen("CERTIFICATE-----");
-		certLen = (int)(end - start);
+		certLen = (int32)(end - start);
 	} else {
 		return -1;
 	}
-	*out = psMalloc(certLen);
+	*out = psMalloc(NULL, certLen);
+	if (*out == NULL) {
+		return -8;  /* SSL_MEM_ERROR */
+	}
 	memset(*out, '\0', certLen);
 	*outLen = certLen;
 
@@ -193,17 +205,17 @@ int matrixRsaReadCertMem(char *certBuf, int certLen, unsigned char **out,
 /*
  *	In memory version of matrixRsaReadPrivKeyMem.
  */
-int matrixRsaReadPrivKeyMem(char *keyBuf, int keyBufLen, char *password, 
+int32 matrixRsaReadPrivKeyMem(char *keyBuf, int32 keyBufLen, char *password, 
 		sslRsaKey_t **key)
 {
 	unsigned char	*DERout, *asnp;
 	char			*start, *end;
-	int				DERlen, ret, PEMlen = 0;
+	int32			DERlen, ret, PEMlen = 0;
 #ifdef USE_3DES
 	sslCipherContext_t	ctx;
 	unsigned char	passKey[SSL_DES3_KEY_LEN];
-	unsigned char	*cipherIV = NULL;
-	int				tmp;
+	unsigned char	cipherIV[SSL_DES3_IV_LEN];
+	int32				tmp;
 #endif /* USE_3DES */
 
 	if (keyBuf == NULL) {
@@ -239,7 +251,6 @@ int matrixRsaReadPrivKeyMem(char *keyBuf, int keyBufLen, char *password,
 			return -1;
 		}
 		start += strlen(encryptHeader);
-		cipherIV = psMalloc(SSL_DES3_IV_LEN);
 		/* SECURITY - we assume here that header points to at least 16 bytes of data */
 		tmp = hexToBinary((unsigned char*)start, cipherIV, SSL_DES3_IV_LEN);
 		if (tmp < 0) {
@@ -247,7 +258,7 @@ int matrixRsaReadPrivKeyMem(char *keyBuf, int keyBufLen, char *password,
 			return -1;
 		}
 		start += tmp;
-		generate3DESKey((unsigned char*)password, (int)strlen(password),
+		generate3DESKey((unsigned char*)password, (int32)strlen(password),
 			cipherIV, (unsigned char*)passKey);
 #else  /* !USE_3DES */
 /*
@@ -260,27 +271,20 @@ int matrixRsaReadPrivKeyMem(char *keyBuf, int keyBufLen, char *password,
 	ret = 0;
 	if ((end = strstr(keyBuf, "-----END RSA PRIVATE KEY-----")) == NULL) {
 		matrixStrDebugMsg("Error parsing private key buffer\n", NULL);
-#ifdef USE_3DES
-		if (cipherIV) {
-			psFree(cipherIV);
-		}
-#endif /* USE_3DES */
 		return -1;
 	}
-	PEMlen = (int)(end - start);
+	PEMlen = (int32)(end - start);
 
 /*
 	Take the raw input and do a base64 decode
  */
-	DERout = psMalloc(PEMlen);
+	DERout = psMalloc(NULL, PEMlen);
+	if (DERout == NULL) {
+		return -8; /* SSL_MEM_ERROR */
+	}
 	DERlen = PEMlen;
 	if (ps_base64_decode((unsigned char*)start, PEMlen, DERout, &DERlen) != 0) {
 		psFree(DERout);
-#ifdef USE_3DES
-		if (cipherIV) {
-			psFree(cipherIV);
-		}
-#endif /* USE_3DES */
 		matrixStrDebugMsg("Unable to base64 decode private key\n", NULL);
 		return -1;
 	}
@@ -292,18 +296,21 @@ int matrixRsaReadPrivKeyMem(char *keyBuf, int keyBufLen, char *password,
 	if (password) {
 		matrix3desInit(&ctx, cipherIV, passKey, SSL_DES3_KEY_LEN);
 		matrix3desDecrypt(&ctx, DERout, DERout, DERlen);
-		psFree(cipherIV);
 	}
 #endif /* USE_3DES */
 
 /*
 	Now have the DER stream to extract from in asnp
  */
-	*key = psMalloc(sizeof(sslRsaKey_t));
+	*key = psMalloc(NULL, sizeof(sslRsaKey_t));
+	if (*key == NULL) {
+		psFree(DERout);
+		return -8; /* SSL_MEM_ERROR */
+	}
 	memset(*key, 0x0, sizeof(sslRsaKey_t));
 
 	asnp = DERout;
-	if (psAsnParsePrivateKey(&asnp, DERlen, *key) < 0) {
+	if (psAsnParsePrivateKey(NULL, &asnp, DERlen, *key) < 0) {
 		matrixRsaFreeKey(*key);
 		*key = NULL;
 		memset(DERout, 0x0, PEMlen);
@@ -331,7 +338,7 @@ int matrixRsaReadPrivKeyMem(char *keyBuf, int keyBufLen, char *password,
 	so this function assumes that 'hex' points to 2x 'binlen' bytes of data.
 	Return the number of bytes processed from hex (2x binlen) or < 0 on error.
 */
-static int hexToBinary(unsigned char *hex, unsigned char *bin, int binlen)
+static int32 hexToBinary(unsigned char *hex, unsigned char *bin, int32 binlen)
 {
 	unsigned char	*end, c, highOrder;
 
@@ -378,7 +385,7 @@ static int hexToBinary(unsigned char *hex, unsigned char *bin, int binlen)
 	salt is assumed to point to 8 bytes of data
 	key is assumed to point to 24 bytes of data
 */
-static void generate3DESKey(unsigned char *pass, int passlen, unsigned char *salt, 
+static void generate3DESKey(unsigned char *pass, int32 passlen, unsigned char *salt, 
 					unsigned char *key)
 {
 	sslMd5Context_t		state;
@@ -402,13 +409,14 @@ static void generate3DESKey(unsigned char *pass, int passlen, unsigned char *sal
 
 /******************************************************************************/
 
-static int ssl_rsa_crypt(const unsigned char *in,  unsigned int inlen,
-						unsigned char *out, unsigned int *outlen, 
-						sslRsaKey_t *key, int type)
+static int32 ssl_rsa_crypt(psPool_t *pool, 
+						const unsigned char *in, uint32 inlen,
+						unsigned char *out, uint32 *outlen, 
+						sslRsaKey_t *key, int32 type)
 {
-	mp_int tmp, tmpa, tmpb;
-	unsigned long x;
-	int res;
+	mp_int			tmp, tmpa, tmpb;
+	unsigned long	x;
+	int32			res;
 
 	if (in == NULL || out == NULL || outlen == NULL || key == NULL) {
 		return -1;
@@ -417,12 +425,12 @@ static int ssl_rsa_crypt(const unsigned char *in,  unsigned int inlen,
 /*
 	init and copy into tmp
  */
-	if (_mp_init_multi(&tmp, &tmpa, &tmpb, NULL, NULL, NULL, NULL, NULL)
+	if (_mp_init_multi(pool, &tmp, &tmpa, &tmpb, NULL, NULL, NULL, NULL, NULL)
 		!= MP_OKAY) {
 		matrixStrDebugMsg("ssl_rsa_crypt error: mp_init_multi\n", NULL);
 		goto error;
 	}
-	if (mp_read_unsigned_bin(&tmp, (unsigned char *)in, (int)inlen) != 
+	if (mp_read_unsigned_bin(&tmp, (unsigned char *)in, (int32)inlen) != 
 			MP_OKAY) {
 		matrixStrDebugMsg("ssl_rsa_crypt error: mp_read_unsigned_bin\n", NULL);
 		goto error; 
@@ -436,34 +444,34 @@ static int ssl_rsa_crypt(const unsigned char *in,  unsigned int inlen,
 	}
 	if (type == RSA_PRIVATE) {
 		if (key->optimized) {
-			if (tim_mp_exptmod(&tmp, &key->e, &key->dP, &key->p, &tmpa) != MP_OKAY) {
+			if (tim_mp_exptmod(pool, &tmp, &key->e, &key->dP, &key->p, &tmpa) != MP_OKAY) {
 				matrixStrDebugMsg("decrypt error: mp_exptmod dP, p\n", NULL);
 				goto error;
 			}
-			if (tim_mp_exptmod(&tmp, &key->e, &key->dQ, &key->q, &tmpb) != MP_OKAY) { 
+			if (tim_mp_exptmod(pool, &tmp, &key->e, &key->dQ, &key->q, &tmpb) != MP_OKAY) { 
 				matrixStrDebugMsg("decrypt error: mp_exptmod dQ, q\n", NULL);
 				goto error;
 			}
-			if (mp_mul(&tmpa, &key->qP, &tmpa) != MP_OKAY) {
+			if (mp_mul(pool, &tmpa, &key->qP, &tmpa) != MP_OKAY) {
 				matrixStrDebugMsg("decrypt error: mp_mul qP \n", NULL);
 				goto error;
 			}
-			if (mp_mul(&tmpb, &key->pQ, &tmpb) != MP_OKAY) {
+			if (mp_mul(pool, &tmpb, &key->pQ, &tmpb) != MP_OKAY) {
 				matrixStrDebugMsg("decrypt error: mp_mul pQ\n", NULL);
 				goto error;
 			}
-			if (mp_addmod(&tmpa, &tmpb, &key->N, &tmp) != MP_OKAY) {
+			if (mp_addmod(pool, &tmpa, &tmpb, &key->N, &tmp) != MP_OKAY) {
 				matrixStrDebugMsg("decrypt error: mp_addmod N\n", NULL);
 				goto error;
 			}
 		} else {
-			if (tim_mp_exptmod(&tmp, &key->e, &key->d, &key->N, &tmp) != MP_OKAY) {
+			if (tim_mp_exptmod(pool, &tmp, &key->e, &key->d, &key->N, &tmp) != MP_OKAY) {
 				matrixStrDebugMsg("ssl_rsa_crypt error: mp_exptmod\n", NULL);
 				goto error;
 			}
 		}
 	} else if (type == RSA_PUBLIC) {
-		if (mp_exptmod(&tmp, &key->e, &key->N, &tmp) != MP_OKAY) {
+		if (mp_exptmod(pool, &tmp, &key->e, &key->N, &tmp) != MP_OKAY) {
 			matrixStrDebugMsg("ssl_rsa_crypt error: mp_exptmod\n", NULL);
 			goto error;
 		}
@@ -492,7 +500,7 @@ static int ssl_rsa_crypt(const unsigned char *in,  unsigned int inlen,
 /*
 	convert it
  */
-	if (mp_to_unsigned_bin(&tmp, out) != MP_OKAY) {
+	if (mp_to_unsigned_bin(pool, &tmp, out) != MP_OKAY) {
 		matrixStrDebugMsg("ssl_rsa_crypt error: mp_to_unsigned_bin\n", NULL);
 		goto error;
 	}
@@ -521,11 +529,11 @@ done:
 	- if id is public, data is FF for the same length as described above
 	- There must be at least 8 bytes of data.
 */
-static int sslPadRSA(unsigned char *in, int inlen, unsigned char *out,
-			int outlen, int cryptType)
+static int32 sslPadRSA(unsigned char *in, int32 inlen, unsigned char *out,
+			int32 outlen, int32 cryptType)
 {
-	unsigned char *c;
-	int	randomLen;
+	unsigned char	*c;
+	int32			randomLen;
 	
 	randomLen = outlen - 3 - inlen;
 	if (randomLen < 8) {
@@ -569,29 +577,26 @@ static int sslPadRSA(unsigned char *in, int inlen, unsigned char *out,
 /******************************************************************************/
 /*
 	RSA private encryption.  
+	Called by client SSL for client authentication in CertificateVerify
 	The outlen param must be set to the strength of the key:  key->size
 */
-int matrixRsaEncryptPriv(sslRsaKey_t *key, unsigned char *in, int inlen,
-						 unsigned char *out, int outlen)
+int32 matrixRsaEncryptPriv(psPool_t *pool, sslRsaKey_t *key, 
+						 unsigned char *in, int32 inlen,
+						 unsigned char *out, int32 outlen)
 {
-	unsigned char	*tmpIn;
-	int				size;
+	int32	size;
 
 	size = key->size;
 	if (outlen < size) {
 		return -1;
 	}
-	tmpIn = psMalloc(size);
-	if (sslPadRSA(in, inlen, tmpIn, size, RSA_PUBLIC) < 0) {
-		psFree(tmpIn);
+	if (sslPadRSA(in, inlen, out, size, RSA_PUBLIC) < 0) {
 		return -1;
 	}
-	if (ssl_rsa_crypt(tmpIn, size, out, &outlen, key, RSA_PRIVATE) < 0 ||
+	if (ssl_rsa_crypt(pool, out, size, out, &outlen, key, RSA_PRIVATE) < 0 ||
 			outlen != size) {
-		psFree(tmpIn);
 		return -1;
 	}
-	psFree(tmpIn);
 	return size;
 }
 #endif /* USE_RSA_PRIVATE_ENCRYPT */
@@ -599,36 +604,34 @@ int matrixRsaEncryptPriv(sslRsaKey_t *key, unsigned char *in, int inlen,
 #ifdef USE_RSA_PUBLIC_ENCRYPT
 /******************************************************************************/
 /*
-	RSA public encryption.  
+	RSA public encryption.
+	Always called by SSL client for server auth in ClientKeyExchange
 	The outlen param must be set to the strength of the key:  key->size
 */
-int matrixRsaEncryptPub(sslRsaKey_t *key, unsigned char *in, int inlen,
-						unsigned char *out, int outlen)
+int32 matrixRsaEncryptPub(psPool_t *pool, sslRsaKey_t *key, 
+						unsigned char *in, int32 inlen,
+						unsigned char *out, int32 outlen)
 {
-	unsigned char	*tmpIn;
-	int				size;
+	int32	size;
 
 	size = key->size;
 	if (outlen < size) {
 		return -1;
 	}
-	tmpIn = psMalloc(size);
-	if (sslPadRSA(in, inlen, tmpIn, size, RSA_PRIVATE) < 0) {
-		psFree(tmpIn);
+	if (sslPadRSA(in, inlen, out, size, RSA_PRIVATE) < 0) {
 		return -1;
 	}
-	if (ssl_rsa_crypt(tmpIn, size, out, &outlen, key, RSA_PUBLIC) < 0 ||
+	if (ssl_rsa_crypt(pool, out, size, out, &outlen, key, RSA_PUBLIC) < 0 ||
 			outlen != size) {
-		psFree(tmpIn);
 		return -1;
 	}
-	psFree(tmpIn);
 	return size;
 }
 
 #else  /* USE_RSA_PUBLIC_ENCRYPT - Keeps the cipher suite definition clean */
-int matrixRsaEncryptPub(sslRsaKey_t *key, unsigned char *in, int inlen,
-						unsigned char *out, int outlen)
+int32 matrixRsaEncryptPub(psPool_t *pool, sslRsaKey_t *key, 
+						unsigned char *in, int32 inlen,
+						unsigned char *out, int32 outlen)
 {
 	if (inlen > outlen) {
 		return -1;
@@ -649,8 +652,8 @@ int matrixRsaEncryptPub(sslRsaKey_t *key, unsigned char *in, int inlen,
 
 	We don't worry about v2 rollback issues because we don't support v2
 */
-static int sslUnpadRSA(unsigned char *in, int inlen, unsigned char *out, 
-					   int outlen, int decryptType)
+static int32 sslUnpadRSA(unsigned char *in, int32 inlen, unsigned char *out, 
+					   int32 outlen, int32 decryptType)
 {
 	unsigned char	*c, *end;
 
@@ -697,80 +700,91 @@ static int sslUnpadRSA(unsigned char *in, int inlen, unsigned char *out,
 }
 
 /******************************************************************************/
-
-int matrixRsaDecryptPriv(sslRsaKey_t *key, unsigned char *in, int inlen,
-						 unsigned char *out, int outlen)
+/*
+	Always called by the server to decrypt the ClientKeyExchange
+*/
+int32 matrixRsaDecryptPriv(psPool_t *pool, sslRsaKey_t *key, 
+						 unsigned char *in, int32 inlen,
+						 unsigned char *out, int32 outlen)
 {
-	unsigned char	*tmpOut;
-	int				ptLen;
+	int32		ptLen;
 
 	if (inlen != key->size) {
 		return -1;
 	}
-	tmpOut = psMalloc(inlen);
-	if (ssl_rsa_crypt(in, inlen, tmpOut, &inlen, key, RSA_PRIVATE) < 0) {
-		psFree(tmpOut);
+	ptLen = inlen;
+	if (ssl_rsa_crypt(pool, in, inlen, in, &ptLen, key, RSA_PRIVATE) < 0 || 
+			ptLen != inlen) {
 		return -1;
 	}
-	ptLen = sslUnpadRSA(tmpOut, inlen, out, outlen, RSA_PRIVATE);
-	memset(tmpOut, 0x0, inlen);
-	psFree(tmpOut);
+	ptLen = sslUnpadRSA(in, inlen, out, outlen, RSA_PRIVATE);
+	memset(in, 0x0, inlen);
 	return ptLen;
 }
 
-int matrixRsaDecryptPub(sslRsaKey_t *key, unsigned char *in, int inlen,
-						unsigned char *out,	int outlen)
+/*
+	Called by the server if authenticating client in CertificateVerify
+*/
+int32 matrixRsaDecryptPub(psPool_t *pool, sslRsaKey_t *key, 
+						unsigned char *in, int32 inlen,
+						unsigned char *out,	int32 outlen)
 {
-	unsigned char	*tmpOut;
-	int				ptLen;
+	int32		ptLen;
 
 	if (inlen != key->size) {
 		return -1;
 	}
-	tmpOut = psMalloc(inlen);
-	memset(tmpOut, '\0', inlen);
-	if (ssl_rsa_crypt(in, inlen, tmpOut, &inlen, key, RSA_PUBLIC) < 0) {
-		psFree(tmpOut);
+	ptLen = inlen;
+	if (ssl_rsa_crypt(pool, in, inlen, in, &ptLen, key, RSA_PUBLIC) < 0 ||
+			ptLen != inlen) {
 		return -1;
 	}
-	ptLen = sslUnpadRSA(tmpOut, inlen, out, outlen, RSA_PUBLIC);
-	psFree(tmpOut);
+	ptLen = sslUnpadRSA(in, inlen, out, outlen, RSA_PUBLIC);
 	return 0;
 }
+
 
 #ifdef USE_X509
 /******************************************************************************/
 /*
 	Walk through the certificate chain and validate it.  Return the final
-	member of the chain as the subjectCert than can then be validated against
+	member of the chain as the subjectCert that can then be validated against
 	the CAs
 */
-int matrixX509ValidateChain(sslRsaCert_t *chain, sslRsaCert_t **subjectCert)
+int32 matrixX509ValidateChain(psPool_t *pool, sslRsaCert_t *chain, 
+							sslRsaCert_t **subjectCert)
 {
 	sslRsaCert_t	*ic;
 
 	*subjectCert = chain;
 	while ((*subjectCert)->next != NULL) {
 		ic = (*subjectCert)->next;
-		if (matrixX509ValidateCert(*subjectCert, ic, 1) < 0) {
+		if (matrixX509ValidateCertInternal(pool, *subjectCert, ic, 1) < 0) {
 			return -1;
 		}
 		*subjectCert = (*subjectCert)->next;
 	}
 	return 0;
 }
+
 /******************************************************************************/
 /*
 	A signature validation for certificates.  -1 return is an error.  The success
 	of the validation is returned in the 'valid' param of the subjectCert.
 	1 if the issuerCert	signed the subject cert. -1 if not
 */
-int matrixX509ValidateCert(sslRsaCert_t *subjectCert, sslRsaCert_t *issuerCert,
-						   int chain)
+int32 matrixX509ValidateCert(psPool_t *pool, sslRsaCert_t *subjectCert, 
+						   sslRsaCert_t *issuerCert)
+{
+	return matrixX509ValidateCertInternal(pool, subjectCert, issuerCert, 0);
+}
+
+static int32 matrixX509ValidateCertInternal(psPool_t *pool, sslRsaCert_t *subjectCert, 
+						   sslRsaCert_t *issuerCert, int32 chain)
 {
 	sslRsaCert_t	*ic;
-	unsigned char	*sigOut;
-	int				sigLen;
+	unsigned char	sigOut[10 + SSL_SHA1_HASH_SIZE + 5];	/* See below */
+	int32			sigLen;
 
 	subjectCert->valid = -1;
 /*
@@ -792,7 +806,7 @@ int matrixX509ValidateCert(sslRsaCert_t *subjectCert, sslRsaCert_t *issuerCert,
 	while (ic) {
 		if (subjectCert != ic) {
 /*
-			Certificate authority contraint only available in version 3 certs
+			Certificate authority constraint only available in version 3 certs
 */
 			if ((ic->version > 1) && (ic->extensions.bc.ca <= 0)) {
 				if (chain) {
@@ -818,31 +832,30 @@ int matrixX509ValidateCert(sslRsaCert_t *subjectCert, sslRsaCert_t *issuerCert,
 		The sigLen is the ASN.1 size in bytes for encoding the hash.
 		The magic 10 is comprised of the SEQUENCE and ALGORITHM ID overhead.
 		The magic 8 and 5 are the OID lengths of the corresponding algorithm.
+		NOTE: if sigLen is modified, above sigOut static size must be changed
 */
-		if (subjectCert->sigAlgorithm == OID_RSA_MD5 ||
+		if (subjectCert->sigAlgorithm ==  OID_RSA_MD5 ||
 				subjectCert->sigAlgorithm == OID_RSA_MD2) {
-			sigLen = 10 + SSL_MD5_HASH_SIZE + 8;
+			sigLen = 10 + SSL_MD5_HASH_SIZE + 8;	/* See above */
 		} else if (subjectCert->sigAlgorithm == OID_RSA_SHA1) {
-			sigLen = 10 + SSL_SHA1_HASH_SIZE + 5;
+			sigLen = 10 + SSL_SHA1_HASH_SIZE + 5;	/* See above */
 		} else {
 			matrixStrDebugMsg("Unsupported signature algorithm\n", NULL);
 			return -1;
 		}
-		sigOut = psMalloc(sigLen);
-		matrixRsaDecryptPub(&(ic->publicKey), subjectCert->signature,
+		sslAssert(sigLen <= sizeof(sigOut));
+		matrixRsaDecryptPub(pool, &(ic->publicKey), subjectCert->signature,
 			subjectCert->signatureLen, sigOut, sigLen);
 /*
 		If this is a chain test, fail on any gaps in the chain
 */
-		if (psAsnConfirmSignature(subjectCert, sigOut, sigLen) < 0) {
-			psFree(sigOut);
+		if (psAsnConfirmSignature(subjectCert->sigHash, sigOut, sigLen) < 0) {
 			if (chain) {
 				return -1;
 			}
 			ic = ic->next;
 			continue;
 		}
-		psFree(sigOut);
 /*
 		Fall through to here only if passed signature check.
 */
@@ -857,11 +870,11 @@ int matrixX509ValidateCert(sslRsaCert_t *subjectCert, sslRsaCert_t *issuerCert,
 	Calls a user defined callback to allow for manual validation of the
 	certificate.
 */
-int matrixX509UserValidator(sslRsaCert_t *subjectCert,
-			int (*certValidator)(sslCertInfo_t *t, void *arg), void *arg)
+int32 matrixX509UserValidator(psPool_t *pool, sslRsaCert_t *subjectCert,
+			int32 (*certValidator)(sslCertInfo_t *t, void *arg), void *arg)
 {
 	sslCertInfo_t	*cert, *current, *next;
-	int				rc;
+	int32			rc;
 
 	if (certValidator == NULL) {
 		return 0;
@@ -869,7 +882,10 @@ int matrixX509UserValidator(sslRsaCert_t *subjectCert,
 /*
 	Pass the entire certificate chain to the user callback.
 */
-	current = cert = psMalloc(sizeof(sslCertInfo_t));
+	current = cert = psMalloc(pool, sizeof(sslCertInfo_t));
+	if (current == NULL) {
+		return -8; /* SSL_MEM_ERROR */
+	}
 	memset(cert, 0x0, sizeof(sslCertInfo_t));
 	while (subjectCert) {
 		
@@ -897,14 +913,23 @@ int matrixX509UserValidator(sslRsaCert_t *subjectCert,
 		current->subjectAltName.uri = (char*)subjectCert->extensions.san.uri;
 		current->subjectAltName.email = (char*)subjectCert->extensions.san.email;
 	
-		if (subjectCert->certAlgorithm == OID_RSA_MD5) {
+		if (subjectCert->certAlgorithm == OID_RSA_MD5 ||
+				subjectCert->certAlgorithm == OID_RSA_MD2) {
 			current->sigHashLen = SSL_MD5_HASH_SIZE;
 		} else if (subjectCert->certAlgorithm == OID_RSA_SHA1) {
 			current->sigHashLen = SSL_SHA1_HASH_SIZE;
 		}
 		current->sigHash = (char*)subjectCert->sigHash;
 		if (subjectCert->next) {
-			next = psMalloc(sizeof(sslCertInfo_t));
+			next = psMalloc(pool, sizeof(sslCertInfo_t));
+			if (next == NULL) {
+				while (cert) {
+					next = cert->next;
+					psFree(cert);
+					cert = next;
+				}
+				return -8; /* SSL_MEM_ERROR */
+			}
 			memset(next, 0x0, sizeof(sslCertInfo_t));
 			current->next = next;
 			current = next;
@@ -948,76 +973,72 @@ void matrixRsaFreeKey(sslRsaKey_t *key)
 
 #ifdef USE_RSA_BLINDING
 
-static int tim_mp_exptmod(mp_int *c, mp_int *e, mp_int *d, mp_int *n, mp_int *m)
+static int32 tim_mp_exptmod(psPool_t *pool, 
+						  mp_int *c, mp_int *e, mp_int *d, mp_int *n, mp_int *m)
 {
-	int			err;
-	mp_int		r, tmp, tmp2;
-
-	unsigned char *rtmp;
-	unsigned long rlen;
-
+	int32			err;
+	mp_int			r, tmp, tmp2;
+	unsigned char	*rtmp;
+	unsigned long	rlen;
 /*
 	pick random r
  */
 	rlen = mp_unsigned_bin_size(n);
 
-	rtmp = psMalloc(rlen);
+	rtmp = psMalloc(pool, rlen);
+	if (rtmp == NULL) {
+		return -8; /* SSL_MEM_ERROR */
+	}
 	sslGetEntropy(rtmp, rlen);
 
-	if ((err = _mp_init_multi(&r, &tmp, &tmp2, NULL, NULL, NULL, NULL,
+	if ((err = _mp_init_multi(pool, &r, &tmp, &tmp2, NULL, NULL, NULL, NULL,
 			NULL)) != MP_OKAY) {
 		psFree(rtmp);
 		return -1;
 	}
-
 /*
 	read in r
  */
 	if ((err = mp_read_unsigned_bin(&r, rtmp, rlen)) != MP_OKAY) {
 		goto __ERR;
 	}
-
 /*
 	compute tmp = r^e
  */
-	if ((err = mp_exptmod(&r, e, n, &tmp)) != MP_OKAY) {
+	if ((err = mp_exptmod(pool, &r, e, n, &tmp)) != MP_OKAY) {
 		goto __ERR;
 	}
-
 /*
 	multiply C into the mix
  */
-	if ((err = mp_mulmod(c, &tmp, n, &tmp)) != MP_OKAY) {
+	if ((err = mp_mulmod(pool, c, &tmp, n, &tmp)) != MP_OKAY) {
 		goto __ERR;
 	}
-
 /*
 	raise to d
  */
-	if ((err = mp_exptmod(&tmp, d, n, &tmp)) != MP_OKAY) {
+	if ((err = mp_exptmod(pool, &tmp, d, n, &tmp)) != MP_OKAY) {
 		goto __ERR;
 	}
-
 /*
 	invert r and multiply
  */
-	if ((err = mp_invmod(&r, n, &tmp2)) != MP_OKAY) {
+	if ((err = mp_invmod(pool, &r, n, &tmp2)) != MP_OKAY) {
 		goto __ERR;
 	}
-
 /*
 	multiply and we are totally set
  */
-	if ((err = mp_mulmod(&tmp, &tmp2, n, m)) != MP_OKAY) {
+	if ((err = mp_mulmod(pool, &tmp, &tmp2, n, m)) != MP_OKAY) {
 		goto __ERR;
 	}
 
-
-	__ERR:  _mp_clear_multi(&r, &tmp, &tmp2, NULL, NULL, NULL, NULL, NULL);
+__ERR:  _mp_clear_multi(&r, &tmp, &tmp2, NULL, NULL, NULL, NULL, NULL);
 	psFree(rtmp);
 	return err;
 }
 #endif /* USE_RSA_BLINDING */
 
 /******************************************************************************/
+
 
