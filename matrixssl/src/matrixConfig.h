@@ -1,6 +1,6 @@
 /*
  *	matrixConfig.h
- *	Release $Name: MATRIXSSL_1_2_4_OPEN $
+ *	Release $Name: MATRIXSSL_1_2_5_OPEN $
  *
  *	Configuration settings for building the MatrixSSL library.
  *	These options affect the size and algorithms present in the library.
@@ -11,8 +11,7 @@
  *
  *	This software is open source; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
- *	the Free Software Foundation; either version 2 of the License, or
- *	(at your option) any later version.
+ *	the Free Software Foundation version 2.
  *
  *	This General Public License does NOT permit incorporating this software 
  *	into proprietary programs.  If you are unable to comply with the GPL, a 

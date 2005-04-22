@@ -23,3 +23,6 @@ Revision history for Perl extension Crypt::MatrixSSL.
 	- Updated to use matrixssl-1-2-4
 	- Scripted the header-file-adjustents so Win32 compilations properly "inline" future releases too
 
+0.06  Fri Apr 22 18:24:58 GMT 2005
+	- Updated to use matrixssl-1-2-5
+	

@@ -1,6 +1,6 @@
 /*
  *	linux.c
- *	Release $Name: MATRIXSSL_1_2_4_OPEN $
+ *	Release $Name: MATRIXSSL_1_2_5_OPEN $
  *
  *	Linux compatibility layer
  *	Other UNIX like operating systems should also be able to use this
@@ -12,8 +12,7 @@
  *
  *	This software is open source; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
- *	the Free Software Foundation; either version 2 of the License, or
- *	(at your option) any later version.
+ *	the Free Software Foundation version 2.
  *
  *	This General Public License does NOT permit incorporating this software 
  *	into proprietary programs.  If you are unable to comply with the GPL, a 
@@ -51,7 +50,7 @@
 static sslTime_t	hiresStart; 	/* zero-time */
 static sslTime_t	hiresFreq; 		/* tics per second */
 #else /* __i386__ */
-static unsigned	int32 prevTicks; 		/* Check wrap */
+static uint32		prevTicks; 		/* Check wrap */
 static sslTime_t	elapsedTime; 	/* Last elapsed time */
 #endif
 

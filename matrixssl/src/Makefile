@@ -66,7 +66,7 @@ endif
 #
 SHARED	= -shared
 CFLAGS  = $(DFLAGS) -DLINUX -I./ -Icrypto/peersec
-LDFLAGS = -lc -lpthread -lcrypto
+LDFLAGS = -lc -lpthread
 
 #
 #	Override variables for compilation on Mac OS X (Darwin)

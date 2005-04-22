@@ -15,7 +15,7 @@ my $o = $Config{obj_ext};
 my $c='.c';
 
 
-# NOTE: For future versions of MatrixSSL (this is v1-1-4) - you might need to do this;
+# NOTE: For future versions of MatrixSSL (this is v1-1-5) - you might need to do this;
 #       1. cd matrixssl
 #       2. make all
 #       3. find . -name '*.o' -print >/tmp/objs
