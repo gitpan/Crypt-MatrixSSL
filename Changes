@@ -25,4 +25,7 @@ Revision history for Perl extension Crypt::MatrixSSL.
 
 0.06  Fri Apr 22 18:24:58 GMT 2005
 	- Updated to use matrixssl-1-2-5
+
+0.07  Wed May  4 23:28:55 GMT 2005
+	- Added matrixSslReadKeysMem (previously overlooked due to scarce documentation)
 	

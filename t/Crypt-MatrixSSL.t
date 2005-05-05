@@ -38,6 +38,7 @@ print "matrixSslOpen() returns '$rc'\n" if($cdbg);
 
 
 # Tell it where our key files are
+my(%keys);
 my $skeyfile = "mxprivkeySrv.pem";
 my $ckeyfile = "mxprivkeyCln.pem";
 my $scertfile = "mxcertSrv.pem";
@@ -49,7 +50,8 @@ my $smxkeys=333;
 $rc=333;
 
 # Read in our keys - not needed for clients who don't validate server certs.
-$rc=Crypt::MatrixSSL::matrixSslReadKeys($smxkeys, $scertfile, $skeyfile, undef, $sCAfile);
+# $rc=Crypt::MatrixSSL::matrixSslReadKeys($smxkeys, $scertfile, $skeyfile, undef, $sCAfile);
+$rc=Crypt::MatrixSSL::matrixSslReadKeysMem($smxkeys, $keys{'scertfile'}, $keys{'skeyfile'}, undef, $keys{'sCAfile'});
 ok($rc==0,'matrixSslReadKeys');
 ok($smxkeys!=0,'matrixSslReadKeys1');
 ok($smxkeys!=333,'matrixSslReadKeys2');
@@ -274,8 +276,16 @@ sub showme {
 # Create the key files for testing with
 sub MakeKeys {
 
+# TO DO: replace all these with the new peersec ones with longer expiration dates:
+# privkeySrv.pem
+# privkeyCln.pem
+# certSrv.pem
+# certCln.pem
+# CAcertSrv.pem
+# CAcertCln.pem
+
 open(PEM,">$skeyfile");
-print PEM q ~-----BEGIN RSA PRIVATE KEY-----
+$keys{'skeyfile'}= q ~-----BEGIN RSA PRIVATE KEY-----
 MIICWwIBAAKBgQDd5a6/JzURVbrPRc0H445n2JhcHRCiU7AKXCmLrOvr07kQRF+S
 lN4iLIK7l0ksTU6bFagbJ56NOHkjgGcVoTN/Qp3jeFPAsJ8BUB0oiCat9y6vwyGF
 WXk3Kv99AJeZV+VS1g1t29u+0tKBqKMJxBOckqHnxJeK27SRvIrlNED85QIDAQAB
@@ -291,9 +301,10 @@ o2TpqpgZdaWUjwoK4i0CPw8C07aOC/Hp5ia6lTtoA4Zk04m9aaONjRywOGe6XKge
 fp2V6yZuKqt0okYUNahhuenYDSUbErPS8pe0gV20eQ==
 -----END RSA PRIVATE KEY-----
 ~;
+print PEM $keys{'skeyfile'};
 close(PEM);
 open(PEM,">$scertfile");
-print PEM q ~Certificate:
+$keys{'scertfile'}=q ~Certificate:
     Data:
         Version: 3 (0x2)
         Serial Number: 1 (0x1)
@@ -347,9 +358,10 @@ iQ4WE8dAFXapb9jRw4GnNWf52rohlBY90G1IFNM1rhTyhE1RX45b9iAnCYUsWIDS
 m2iui5Mell9vdFRQXJ9/O8li5Pe+b83RMQ==
 -----END CERTIFICATE-----
 ~;
+print PEM $keys{'scertfile'};
 close(PEM);
 open(PEM,">$sCAfile");
-print PEM q ~-----BEGIN CERTIFICATE-----
+$keys{'sCAfile'}= q ~-----BEGIN CERTIFICATE-----
 MIICoDCCAgmgAwIBAgIBADANBgkqhkiG9w0BAQQFADCBjDEXMBUGA1UEAxMOQWNt
 ZSBTYW1wbGUgQ0ExFTATBgNVBAgTDFJob2RlIElzbGFuZDELMAkGA1UEBhMCVVMx
 HzAdBgkqhkiG9w0BCQEWEGNvbnRhY3RAYWNtZS5jb20xEjAQBgNVBAoTCUFjbWUg
@@ -367,6 +379,7 @@ HqHo0YYy2VLDkCYsGJrQZ9THfknxKtjEz1xVdaUwNjzpTzyYjh994f6/ATVeUxRh
 WPLjqA==
 -----END CERTIFICATE-----
 ~;
+print PEM $keys{'sCAfile'};
 close(PEM);
 open(PEM,">$cCAfile");
 print PEM q ~-----BEGIN CERTIFICATE-----

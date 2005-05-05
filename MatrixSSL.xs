@@ -159,6 +159,13 @@ Return Value
 parameter for use in a subsequent call to matrixSslNewSession
 <0 Failure
 
+
+the perl version of matrixSslReadKeysMem is identical to matrixSslReadKeys with
+this difference: instead of passing the filename for the keys into the call,
+you instead pass a scalar containing the actual key info (same as would have
+been in the file).
+
+
 =cut
 
 int
@@ -179,6 +186,32 @@ matrixSslReadKeys(mxkeys, certFile, privFile, privPass, trustedCAcertFiles)
 	if(strlen(itrustedCAcertFiles)==0) { itrustedCAcertFiles=NULL; }
 	/* Note: This takes advantage of perl's inbuilt string null-termination feature */
         RETVAL = matrixSslReadKeys((sslKeys_t **)&mxkeys, icertFile, iprivFile, iprivPass, itrustedCAcertFiles);
+    OUTPUT:
+    	mxkeys
+        RETVAL
+
+
+int
+matrixSslReadKeysMem(mxkeys, certDat, privDat, privPass, trustedCAcertDat)
+	int mxkeys
+       	SV *certDat
+	SV *privDat
+	SV *privPass
+	SV *trustedCAcertDat
+    CODE:
+	int certDatlen;
+	int privDatlen;
+	int trustedCAcertDatlen;
+       	char *icertDat=SvPV(certDat,certDatlen);
+	char *iprivDat=SvPV(privDat,privDatlen);
+	char *iprivPass=SvPV_nolen(privPass);
+	char *itrustedCAcertDat=SvPV(trustedCAcertDat,trustedCAcertDatlen);
+	if(strlen(icertDat)==0) { icertDat=NULL; }
+	if(strlen(iprivDat)==0) { iprivDat=NULL; }
+	if(strlen(iprivPass)==0) { iprivPass=NULL; }
+	if(strlen(itrustedCAcertDat)==0) { itrustedCAcertDat=NULL; }
+	/* Note: This takes advantage of perl's inbuilt string null-termination feature */
+        RETVAL = matrixSslReadKeysMem((sslKeys_t **)&mxkeys, icertDat,certDatlen, iprivDat,privDatlen, iprivPass, itrustedCAcertDat,trustedCAcertDatlen);
     OUTPUT:
     	mxkeys
         RETVAL
