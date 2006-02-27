@@ -1,6 +1,6 @@
 /*
  *	arc4.c
- *	Release $Name: MATRIXSSL_1_2_5_OPEN $
+ *	Release $Name: MATRIXSSL_1_7_3_OPEN $
  *
  *	ARC4 stream cipher implementation
  */
@@ -10,7 +10,8 @@
  *
  *	This software is open source; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
- *	the Free Software Foundation version 2.
+ *	the Free Software Foundation; either version 2 of the License, or
+ *	(at your option) any later version.
  *
  *	This General Public License does NOT permit incorporating this software 
  *	into proprietary programs.  If you are unable to comply with the GPL, a 

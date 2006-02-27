@@ -1,6 +1,6 @@
 /*
  *	matrixSsl.c
- *	Release $Name: MATRIXSSL_1_2_5_OPEN $
+ *	Release $Name: MATRIXSSL_1_7_3_OPEN $
  *
  *	Secure Sockets Layer session management
  */
@@ -10,7 +10,8 @@
  *
  *	This software is open source; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
- *	the Free Software Foundation version 2.
+ *	the Free Software Foundation; either version 2 of the License, or
+ *	(at your option) any later version.
  *
  *	This General Public License does NOT permit incorporating this software 
  *	into proprietary programs.  If you are unable to comply with the GPL, a 
@@ -36,9 +37,6 @@
 
 /******************************************************************************/
 
-static int32 parseList(char *list, const char *sep, char **item);
-static int32 readCertChain(char *certFiles, sslKeys_t *lkeys);
-
 static char copyright[]= "Copyright PeerSec Networks Inc. All rights reserved.";
 
 #ifdef USE_SERVER_SIDE_SSL
@@ -57,8 +55,8 @@ static sslSessionEntry_t	sessionTable[SSL_SESSION_TABLE_SIZE];
 */
 int32 matrixSslOpen()
 {
-	if (sslOpenOsdep() < 0) {
-		matrixStrDebugMsg("Osdep open failure\n", NULL);
+	if (matrixPkiOpen() < 0) {
+		matrixStrDebugMsg("PKI open failure\n", NULL);
 		return -1;
 	}
 
@@ -88,285 +86,30 @@ void matrixSslClose()
 	sslUnlockMutex(&sessionTableLock);
 	sslDestroyMutex(&sessionTableLock);
 #endif /* USE_SERVER_SIDE_SSL */
-	sslCloseOsdep();
+	matrixPkiClose();
 }
 
 /******************************************************************************/
 /*
-	Read in the certificate and private keys from the given files
-	If privPass is non-NULL, it will be used to decode an encrypted private
-	key file.
-	The certificate is stored internally as a pointer to DER encoded X.509
-	The private key is stored in a crypto provider specific structure
+	Wrappers around the RSA versions.  Necessary to keep API backwards compat
 */
-#ifdef USE_FILE_SYSTEM
-int32 matrixSslReadKeys(sslKeys_t **keys, char *certFile, char *privFile,
-					  char *privPass, char *trustedCAFiles)
+int32 matrixSslReadKeys(sslKeys_t **keys, char *certFile,
+						char *privFile, char *privPass, char *trustedCAFile)
 {
-	sslKeys_t		*lkeys;
-	int32			rc;
-#ifdef USE_CLIENT_SIDE_SSL
-	sslRsaCert_t	*currCert, *prevCert = NULL;
-	const char		sep[] = ";";
-	unsigned char	*caCert;
-	char			*caFile, *origList;
-	int32			caCertLen, i;
-#endif /* USE_CLIENT_SIDE_SSL */
-
-	*keys = lkeys = psMalloc(NULL, sizeof(sslKeys_t));
-	if (lkeys == NULL) {
-		return SSL_MEM_ERROR;
-	}
-	memset(lkeys, 0x0, sizeof(sslKeys_t));
-/*
-	Load certificate files.  Any additional certificate files should chain
-	to the root CA held on the other side.
-*/
-	rc = readCertChain(certFile, lkeys);
-	if (rc < 0 ) {
-		matrixSslFreeKeys(lkeys);
-		return rc;
-	}
-/*
-	The first cert in certFile must be associated with the provided private key
-*/
-	rc = matrixRsaReadPrivKey(privFile, privPass, &lkeys->cert.privKey);
-	if (rc < 0) {
-		matrixStrDebugMsg("Error reading private key file: %s\n", privFile);
-		matrixSslFreeKeys(lkeys);
-		return rc;
-	}
-
-/*
-	Now deal with Certificate Authorities
-*/
-#ifdef USE_CLIENT_SIDE_SSL
-	caFile = NULL;
-	origList = trustedCAFiles;
-	if (trustedCAFiles != NULL) {
-		trustedCAFiles += parseList(trustedCAFiles, sep, &caFile);
-	}
-	i = 0;
-	while (caFile != NULL) {
-		caCert = NULL;
-		currCert = NULL;
-		if (matrixRsaReadCert(caFile, &caCert, &caCertLen) < 0 ||
-				caCert == NULL) {
-			matrixStrDebugMsg("Error reading CA cert file %s\n", caFile);
-			psFree(caFile);
-			trustedCAFiles += parseList(trustedCAFiles, sep, &caFile);
-			continue;
-		}
-		psFree(caFile);
-		if (matrixX509ParseCert(NULL, caCert, caCertLen, &currCert) < 0) {
-			matrixStrDebugMsg("Error parsing CA cert %s\n", caFile);
-			psFree(caCert);
-			trustedCAFiles += parseList(trustedCAFiles, sep, &caFile);
-			continue;
-		}
-		psFree(caCert);
-		if (i++ == 0) {
-			lkeys->caCerts = currCert;
-		} else {
-			prevCert->next = currCert;
-		}
-		prevCert = currCert;
-		currCert = NULL;
-		trustedCAFiles += parseList(trustedCAFiles, sep, &caFile);
-	}
-/*
-	Check to see that if a set of CAs were passed in at least
-	one ended up being valid.
-*/
-	if (trustedCAFiles != NULL && lkeys->caCerts == NULL) {
-		matrixStrDebugMsg("No valid CA certs in %s\n", trustedCAFiles);
-		matrixSslFreeKeys(lkeys);
-		return -1;
-	}
-#endif /* USE_CLIENT_SIDE_SSL */
-	return 0; 
-}
-#else /* USE_FILE_SYSTEM */
-int32 matrixSslReadKeys(sslKeys_t **keys, char *certFile, char *privFile,
-					 char *privPass, char *trustedCAFile)
-{
-	matrixStrDebugMsg("Error: Calling matrixSslReadKeys against a library " \
-					  "built without USE_FILE_SYSTEM defined\n", NULL);
-	return -1;
-}
-#endif /* USE_FILE_SYSTEM */
-
-/******************************************************************************/
-/*
-	In memory version of matrixSslReadKeys.
-*/
-int32	matrixSslReadKeysMem(sslKeys_t **keys, char *certBuf, int32 certLen,
-			char *privBuf, int32 privLen, char *privPass, char *trustedCABuf,
-			int32 trustedCALen)
-{
-	sslKeys_t		*lkeys;
-#ifdef USE_CLIENT_SIDE_SSL
-	unsigned char	*caCert;
-	int32			caCertLen;
-#endif /* USE_CLIENT_SIDE_SSL */
-
-	*keys = lkeys = psMalloc(NULL, sizeof(sslKeys_t));
-	if (lkeys == NULL) {
-		return SSL_MEM_ERROR;
-	}
-	memset(lkeys, 0x0, sizeof(sslKeys_t));
-/*
-	Certificate file to send
-*/
-	if (matrixRsaReadCertMem(certBuf, certLen, &lkeys->cert.certBin,
-			&lkeys->cert.certLen) < 0 || matrixRsaReadPrivKeyMem(privBuf,
-			privLen, privPass, &lkeys->cert.privKey) < 0) {
-		matrixStrDebugMsg("Error reading key mem\n", NULL);
-		matrixSslFreeKeys(lkeys);
-		return -1;
-	}
-
-#ifdef USE_CLIENT_SIDE_SSL
-	caCert = NULL;
-/*
-	Certificate used to validate others
-*/
-	if (matrixRsaReadCertMem(trustedCABuf, trustedCALen, &caCert,
-			&caCertLen) < 0) {
-		matrixStrDebugMsg("Error reading CA cert mem\n", NULL);
-		matrixSslFreeKeys(lkeys);
-		return -1;
-	}
-	if (caCert == NULL) {
-		return 0;
-	}
-	if (matrixX509ParseCert(NULL, caCert, caCertLen, &lkeys->caCerts) < 0) {
-		matrixStrDebugMsg("Error parsing CA cert\n", NULL);
-		matrixSslFreeKeys(lkeys);
-		return -1;
-	}
-	psFree(caCert);
-#endif /* USE_CLIENT_SIDE_SSL */
-	return 0;
+	return matrixRsaReadKeys(keys, certFile, privFile, privPass, trustedCAFile);
 }
 
-/******************************************************************************/
-/*
-	Allows for semi-colon delimited list of certificates for cert chaining.
-	The first in the list must be the identifying cert of the application.
-	Each subsequent cert is the next parent.
-*/
-static int32 readCertChain(char *certFiles, sslKeys_t *lkeys)
+int32 matrixSslReadKeysMem(sslKeys_t **keys, char *certBuf,
+						int32 certLen, char *privBuf, int32 privLen,
+						char *trustedCABuf, int32 trustedCALen)
 {
-	sslLocalCert_t	*currCert;
-	const char		sep[] = ";";
-	char			*cert, *origList;
-	unsigned char	*certBin;
-	int32			certLen, i;
-
-	if (certFiles == NULL) {
-		return 0;
-	}
-
-	cert = NULL;
-	origList = certFiles;
-	certFiles += parseList(certFiles, sep, &cert);
-
-	i = 0;
-	while (cert != NULL) {
-		if (matrixRsaReadCert(cert, &certBin, &certLen) < 0) {
-			matrixStrDebugMsg("Error reading cert file %s\n", cert);
-			psFree(cert);
-			return -1;
-		}
-		psFree(cert);
-/*
-		The first cert is allocated in the keys struct.  All others in
-		linked list are allocated here.
-*/
-		if (i++ == 0) {
-			currCert = &lkeys->cert;
-		} else {
-			currCert->next = psMalloc(NULL, sizeof(sslLocalCert_t));
-			if (currCert->next == NULL) {
-				return SSL_MEM_ERROR;
-			}
-			memset(currCert->next, 0x0, sizeof(sslLocalCert_t));
-			currCert = currCert->next;
-		}
-		currCert->certBin = certBin;
-		currCert->certLen = certLen;
-		certFiles += parseList(certFiles, sep, &cert);
-	}
-	return 0;
+	return matrixRsaReadKeysMem(keys, certBuf, certLen, privBuf, privLen,
+		trustedCABuf, trustedCALen);
 }
 
-/******************************************************************************/
-/*
- *	Strtok substitute
- */
-static int32 parseList(char *list, const char *sep, char **item)
-{
-	int32	start, listLen;
-	char	*tmp;
-
-	start = listLen = (int32)strlen(list) + 1;
-	if (start == 1) {
-		*item = NULL;
-		return 0;
-	}
-	tmp = *item = psMalloc(NULL, listLen);
-	if (tmp == NULL) {
-		return SSL_MEM_ERROR;
-	}
-	memset(*item, 0, listLen);
-	while (listLen > 0) {
-		if (*list == sep[0]) {
-			list++;
-			listLen--;
-			break;
-		}
-		if (*list == 0) {
-			break;
-		}
-		*tmp++ = *list++;
-		listLen--;
-	}
-	return start - listLen;
-}
-
-/******************************************************************************/
-/*
-	Free private key and cert and zero memory allocated by matrixSslReadKeys.
-*/
 void matrixSslFreeKeys(sslKeys_t *keys)
 {
-	sslLocalCert_t	*current, *next;
-	int32			i = 0;
-
-	if (keys) {
-		current = &keys->cert;
-		while (current) {
-			if (current->certBin) {
-				memset(current->certBin, 0x0, current->certLen);
-				psFree(current->certBin);
-			}
-			if (current->privKey) {
-				matrixRsaFreeKey(current->privKey);
-			}
-			next = current->next;
-			if (i++ > 0) {
-				psFree(current);
-			}
-			current = next;
-		}
-#ifdef USE_CLIENT_SIDE_SSL
-		if (keys->caCerts) {
-			matrixX509FreeCert(keys->caCerts);
-		}
-#endif /* USE_CLIENT_SIDE_SSL */
-		psFree(keys);
-	}
+	matrixRsaFreeKeys(keys);
 }
 
 
@@ -383,10 +126,8 @@ void matrixSslFreeKeys(sslKeys_t *keys)
 int32 matrixSslNewSession(ssl_t **ssl, sslKeys_t *keys, sslSessionId_t *session,
 						int32 flags)
 {
-	psPool_t	*pool;
+	psPool_t	*pool = NULL;
 	ssl_t		*lssl;
-
-	pool = NULL;
 
 /*
 	First API level chance to make sure a user is not attempting to use
@@ -406,7 +147,6 @@ int32 matrixSslNewSession(ssl_t **ssl, sslKeys_t *keys, sslSessionId_t *session,
 		return -1;
 	}
 #endif
-
 	if (flags & SSL_FLAGS_SERVER) {
 		if (keys == NULL) {
 			matrixStrDebugMsg("NULL keys in  matrixSslNewSession\n", NULL);
@@ -417,6 +157,7 @@ int32 matrixSslNewSession(ssl_t **ssl, sslKeys_t *keys, sslSessionId_t *session,
 			return -1;
 		}
 	}
+
 	*ssl = lssl = psMalloc(pool, sizeof(ssl_t));
 	if (lssl == NULL) {
 		return SSL_MEM_ERROR;
@@ -467,7 +208,6 @@ int32 matrixSslNewSession(ssl_t **ssl, sslKeys_t *keys, sslSessionId_t *session,
 */
 void matrixSslDeleteSession(ssl_t *ssl)
 {
-	psPool_t	*pool, *hsPool;
 
 	if (ssl == NULL) {
 		return;
@@ -499,8 +239,6 @@ void matrixSslDeleteSession(ssl_t *ssl)
 	The cipher and mac contexts are inline in the ssl structure, so
 	clearing the structure clears those states as well.
 */
-	pool = ssl->pool;
-	hsPool = ssl->hsPool;
 	memset(ssl, 0x0, sizeof(ssl_t));
 	psFree(ssl);
 }
@@ -522,6 +260,26 @@ void matrixSslSetSessionOption(ssl_t *ssl, int32 option, void *arg)
 		ssl->sessionIdLen = 0;
 		memset(ssl->sessionId, 0x0, SSL_MAX_SESSION_ID_SIZE);
 	}
+}
+
+/******************************************************************************/
+/*
+	The ssl_t struct is opaque to the socket layer.  Just needed an access
+	routine for the 'anon' status
+*/
+void matrixSslGetAnonStatus(ssl_t *ssl, int32 *certArg)
+{
+	*certArg = ssl->sec.anon;
+}
+
+/******************************************************************************/
+/*
+	Again, the ssl_t is opaque.  Need to associate the new keys with
+	the session for mid-session rekeying
+*/
+void matrixSslAssignNewKeys(ssl_t *ssl, sslKeys_t *keys)
+{
+	ssl->keys = keys;
 }
 
 /******************************************************************************/
@@ -905,7 +663,8 @@ int32 matrixSslGetSessionId(ssl_t *ssl, sslSessionId_t **session)
 
 	if (ssl->cipher != NULL && ssl->cipher->id != SSL_NULL_WITH_NULL_NULL && 
 			ssl->sessionIdLen == SSL_MAX_SESSION_ID_SIZE) {
-		*session = lsession = psMalloc(NULL, sizeof(sslSessionId_t));
+		*session = lsession = psMalloc(PEERSEC_BASE_POOL,
+			sizeof(sslSessionId_t));
 		if (lsession == NULL) {
 			return SSL_MEM_ERROR;
 		}
@@ -950,35 +709,6 @@ void sslResetContext(ssl_t *ssl)
 }
 
 /******************************************************************************/
-/*
-	Debugging APIs
-*/
-#ifdef DEBUG
 
-/* message should contain one %s */
-void matrixStrDebugMsg(char *message, char *value)
-{
-	if (value) {
-		printf(message, value);
-	} else {
-		printf(message);
-	}
-}
-
-/* message should contain one %d */
-void matrixIntDebugMsg(char *message, int32 value)
-{
-	printf(message, value);
-}
-
-/* message should contain one %p */
-void matrixPtrDebugMsg(char *message, void *value)
-{
-	printf(message, value);
-}
-
-#endif /* DEBUG */
-
-/******************************************************************************/
 
 

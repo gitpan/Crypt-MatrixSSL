@@ -1,6 +1,6 @@
 /*
  *	cryptoLayer.h
- *	Release $Name: MATRIXSSL_1_2_5_OPEN $
+ *	Release $Name: MATRIXSSL_1_7_3_OPEN $
  *
  *	Cryptography provider layered header.  This layer decouples
  *	the cryptography implementation from the SSL protocol implementation.
@@ -13,7 +13,8 @@
  *
  *	This software is open source; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
- *	the Free Software Foundation version 2.
+ *	the Free Software Foundation; either version 2 of the License, or
+ *	(at your option) any later version.
  *
  *	This General Public License does NOT permit incorporating this software 
  *	into proprietary programs.  If you are unable to comply with the GPL, a 
@@ -33,14 +34,24 @@
 
 #ifndef _h_CRYPTO_LAYER
 #define _h_CRYPTO_LAYER
-
-#include "../matrixConfig.h"
+#define _h_EXPORT_SYMBOLS
 
 /******************************************************************************/
 /*
 	Crypto may have some reliance on os layer (psMalloc in particular)
 */
 #include "../os/osLayer.h"
+
+/*
+	Return the length of padding bytes required for a record of 'LEN' bytes
+	The name Pwr2 indicates that calculations will work with 'BLOCKSIZE'
+	that are powers of 2.
+	Because of the trailing pad length byte, a length that is a multiple
+	of the pad bytes
+*/
+#define sslPadLenPwr2(LEN, BLOCKSIZE) \
+	BLOCKSIZE <= 1 ? (unsigned char)0 : \
+	(unsigned char)(BLOCKSIZE - ((LEN) & (BLOCKSIZE - 1)))
 
 /*
 	Define the default crypto provider here
@@ -58,9 +69,12 @@ extern "C" {
 #define SSL_MAX_IV_SIZE			16
 #define SSL_MAX_BLOCK_SIZE		16
 #define SSL_MAX_SYM_KEY_SIZE	32
+
+#define USE_X509 /* Must define for certificate support */
 /*
 	Enable the algorithms used for each cipher suite
 */
+
 #ifdef USE_SSL_RSA_WITH_NULL_MD5
 #define USE_RSA
 #define USE_MD5_MAC
@@ -101,7 +115,6 @@ extern "C" {
 	Support for client side SSL
 */
 #ifdef USE_CLIENT_SIDE_SSL
-#define USE_X509
 #define USE_RSA_PUBLIC_ENCRYPT
 #endif
 
@@ -110,135 +123,28 @@ extern "C" {
 */
 
 /*
-	Misc support
+	Addtional crypt support
 */
-/* #define USE_FULL_CERT_PARSE */
 /* #define USE_MD2 */
+/* #define USE_SHA256 */
 
 /*
-	Now that we've set up the required defines, include the crypto layer header
+	Now that we've set up the required defines, include the crypto provider
 */
 #ifdef USE_PEERSEC_CRYPTO
 #include "peersec/pscrypto.h"
 #endif
 
-#ifdef USE_ARC4
-extern void matrixArc4Init(sslCipherContext_t *ctx, unsigned char *key, int32 keylen);
-extern int32 matrixArc4(sslCipherContext_t *ctx, unsigned char *in,
-					  unsigned char *out, int32 len);
-#endif /* USE_ARC4 */
-
-#ifdef USE_3DES
-extern int32 matrix3desInit(sslCipherContext_t *ctx, unsigned char *IV,
-						  unsigned char *key, int32 keylen);
-extern int32 matrix3desEncrypt(sslCipherContext_t *ctx, unsigned char *pt,\
-							 unsigned char *ct, int32 len);
-extern int32 matrix3desDecrypt(sslCipherContext_t *ctx, unsigned char *ct,
-							 unsigned char *pt, int32 len);
-#endif /* USE_3DES */
-
-extern void matrixMd5Init(sslMd5Context_t *ctx);
-extern void matrixMd5Update(sslMd5Context_t *ctx, const unsigned char *buf, unsigned long len);
-extern int32 matrixMd5Final(sslMd5Context_t *ctx, unsigned char *hash);
-
-#ifdef USE_MD2
+/******************************************************************************/
 /*
-	MD2 is provided for compatibility with V2 and older X509 certificates,
-	it is known to have security problems and should not be used for any current
-	development.
+	Include the public prototypes now.  This level of indirection is needed
+	to properly expose the public APIs to DLLs.  The circular reference
+	between these two files is avoided with the top level defines and the
+	order in which they are included is the key to making this work so edit
+	with caution.
 */
-extern void matrixMd2Init(sslMd2Context_t *ctx);
-extern int32 matrixMd2Update(sslMd2Context_t *ctx, const unsigned char *buf, unsigned long len);
-extern int32 matrixMd2Final(sslMd2Context_t *ctx, unsigned char *hash);
-#endif /* USE_MD2 */
+#include "matrixCrypto.h"
 
-extern void matrixSha1Init(sslSha1Context_t *ctx);
-extern void matrixSha1Update(sslSha1Context_t *ctx, const unsigned char *buf, unsigned long len);
-extern int32 matrixSha1Final(sslSha1Context_t *ctx, unsigned char *hash);
-
-#ifdef USE_RSA
-#ifdef USE_FILE_SYSTEM
-extern int32 matrixRsaReadCert(char *fileName, unsigned char **out, int32 *outLen);
-extern int32 matrixRsaReadPrivKey(char *fileName, char *password, sslRsaKey_t **key);
-#endif /* USE_FILE_SYSTEM */
-
-extern int32 matrixRsaReadPrivKeyMem(char *keyBuf, int32 keyBufLen, char *password, sslRsaKey_t **key);
-extern int32 matrixRsaReadCertMem(char *certBuf, int32 certLen, unsigned char **out, int32 *outLen);
-
-extern void matrixRsaFreeKey(sslRsaKey_t *key);
-
-extern int32 matrixRsaEncryptPub(psPool_t *pool, sslRsaKey_t *key, 
-							   unsigned char *in, int32 inlen,
-							   unsigned char *out, int32 outlen);
-extern int32 matrixRsaDecryptPriv(psPool_t *pool, sslRsaKey_t *key, 
-								unsigned char *in, int32 inlen,
-								unsigned char *out, int32 outlen);
-extern int32 matrixRsaEncryptPriv(psPool_t *pool, sslRsaKey_t *key, 
-								unsigned char *in, int32 inlen,
-								unsigned char *out, int32 outlen);
-extern int32 matrixRsaDecryptPub(psPool_t *pool, sslRsaKey_t *key, 
-							   unsigned char *in, int32 inlen,
-							   unsigned char *out, int32 outlen);
-
-
-#endif /* USE_RSA */
-
-#ifdef USE_AES
-extern int32 matrixAesInit(sslCipherContext_t *ctx, unsigned char *IV,
-						 unsigned char *key, int32 keylen);
-extern int32 matrixAesEncrypt(sslCipherContext_t *ctx, unsigned char *pt,
-							unsigned char *ct, int32 len);
-extern int32 matrixAesDecrypt(sslCipherContext_t *ctx, unsigned char *ct,
-							unsigned char *pt, int32 len);
-#endif /* USE_AES */
-
-/*
-	Any change to these cert structs must be reflected in
-	matrixSsl.h for public use
-*/
-typedef struct {
-	char	*country;
-	char	*state;
-	char	*locality;
-	char	*organization;
-	char	*orgUnit;
-	char	*commonName;
-} sslDistinguishedName_t;
-
-typedef struct {
-	char	*dns;
-	char	*uri;
-	char	*email;
-} sslSubjectAltName_t;
-
-typedef struct sslCertInfo {
-	int32						verified;
-	unsigned char			*serialNumber;
-	int32						serialNumberLen;
-	char					*notBefore;
-	char					*notAfter;
-	char					*sigHash;
-	int32						sigHashLen;
-	sslSubjectAltName_t		subjectAltName;
-	sslDistinguishedName_t	subject;
-	sslDistinguishedName_t	issuer;
-	struct sslCertInfo		*next;
-} sslCertInfo_t;
-
-#ifdef USE_X509
-
-extern int32 matrixX509ParseCert(psPool_t *pool, unsigned char *certBuf, 
-							   int32 certlen, sslRsaCert_t **cert);
-extern void matrixX509FreeCert(sslRsaCert_t *cert);
-extern int32 matrixX509ValidateCert(psPool_t *pool, sslRsaCert_t *subjectCert,
-								  sslRsaCert_t *issuerCert);
-extern int32 matrixX509ValidateChain(psPool_t *pool, sslRsaCert_t *chain,
-								   sslRsaCert_t **subjectCert);
-extern int32 matrixX509UserValidator(psPool_t *pool, 
-						sslRsaCert_t *subjectCert,
-						int32 (*certValidator)(sslCertInfo_t *t, void *arg),
-						void *arg);
-#endif /* USE_X509 */
 
 #ifdef __cplusplus
    }
@@ -247,4 +153,5 @@ extern int32 matrixX509UserValidator(psPool_t *pool,
 #endif /* _h_CRYPTO_LAYER */
 
 /******************************************************************************/
+
 

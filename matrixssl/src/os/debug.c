@@ -1,8 +1,6 @@
 /*
- *	psMalloc.h
+ *	debug.c
  *	Release $Name: MATRIXSSL_1_7_3_OPEN $
- *	
- *	Header for psMalloc functions
  */
 /*
  *	Copyright (c) PeerSec Networks, 2002-2005. All Rights Reserved.
@@ -27,38 +25,38 @@
  *	Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *	http://www.gnu.org/copyleft/gpl.html
  */
-/******************************************************************************/
 
-#ifndef _h_PS_MALLOC
-#define _h_PS_MALLOC
-
-#define PEERSEC_BASE_POOL 0
-#define PEERSEC_NO_POOL	(void *)0x00001
+#include "osLayer.h"
 
 /******************************************************************************/
 /*
-	Because a set of public APIs are exposed here there is a dependence on
-	the package.  The config layer header must be parsed to determine what
-	defines are configured
+	Debugging APIs
 */
-#include "../../matrixCommon.h"
+#ifdef DEBUG
 
-/*
-	Native memory routines
-*/
-#define MAX_MEMORY_USAGE	0
-#define psOpenMalloc(A) 0
-#define psCloseMalloc()
-#define psMalloc(A, B)		malloc(B)
-#define psCalloc(A, B, C)	calloc(B, C)
-#define psRealloc	realloc
-#define psFree		free
-#define psMemset	memset
-#define psMemcpy	memcpy
-typedef int32 psPool_t;
+/* message should contain one %s */
+void matrixStrDebugMsg(char *message, char *value)
+{
+	if (value) {
+		printf(message, value);
+	} else {
+		printf(message);
+	}
+}
 
-#endif /* _h_PS_MALLOC */
+/* message should contain one %d */
+void matrixIntDebugMsg(char *message, int32 value)
+{
+	printf(message, value);
+}
 
+/* message should contain one %p */
+void matrixPtrDebugMsg(char *message, void *value)
+{
+	printf(message, value);
+}
 
+#endif /* DEBUG */
 
+/******************************************************************************/
 

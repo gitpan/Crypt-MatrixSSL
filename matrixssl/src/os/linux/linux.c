@@ -1,6 +1,6 @@
 /*
  *	linux.c
- *	Release $Name: MATRIXSSL_1_2_5_OPEN $
+ *	Release $Name: MATRIXSSL_1_7_3_OPEN $
  *
  *	Linux compatibility layer
  *	Other UNIX like operating systems should also be able to use this
@@ -12,7 +12,8 @@
  *
  *	This software is open source; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
- *	the Free Software Foundation version 2.
+ *	the Free Software Foundation; either version 2 of the License, or
+ *	(at your option) any later version.
  *
  *	This General Public License does NOT permit incorporating this software 
  *	into proprietary programs.  If you are unable to comply with the GPL, a 
@@ -65,7 +66,7 @@ static pthread_mutexattr_t	attr;
 static 	int32	urandfd = -1;
 static 	int32	randfd	= -1;
 
-int32 sslOpenOsdep()
+int32 sslOpenOsdep(void)
 {
 	FILE		*cpuInfo;
 	double		mhz;
@@ -119,15 +120,15 @@ int32 sslOpenOsdep()
 	itself, rather than error or recursive lock
 */
 #ifdef USE_MULTITHREADING
+	pthread_mutexattr_init(&attr);
 #ifndef OSX
 	pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE_NP);
 #endif /* !OSX */
-	pthread_mutexattr_init(&attr);
 #endif /* USE_MULTITHREADING */
 	return psOpenMalloc(MAX_MEMORY_USAGE);
 }
 
-int32 sslCloseOsdep()
+int32 sslCloseOsdep(void)
 {
 	psCloseMalloc();
 #ifdef USE_MULTITHREADING
@@ -145,10 +146,10 @@ int32 sslCloseOsdep()
 
 int32 sslGetEntropy(unsigned char *bytes, int32 size)
 {
-	int32				rc, sanity, retry;
+	int32				rc, sanity, retry, readBytes;
 	unsigned char 	*where = bytes;
 
-	sanity = retry = rc = 0;
+	sanity = retry = rc = readBytes = 0;
 
 	while (size) {
 		if ((rc = read(randfd, where, size)) < 0 || sanity > MAX_RAND_READS) {
@@ -171,6 +172,7 @@ int32 sslGetEntropy(unsigned char *bytes, int32 size)
 				break;
 			}
 		}
+		readBytes += rc;
 		where += rc;
 		size -= rc;
 	}
@@ -197,14 +199,15 @@ int32 sslGetEntropy(unsigned char *bytes, int32 size)
 				return -1;
 			}
 		}
+		readBytes += rc;
 		where += rc;
 		size -= rc;
 	}
-	return rc;
+	return readBytes;
 }
 
 #ifdef DEBUG
-void psBreak()
+void psBreak(void)
 {
 	abort();
 }

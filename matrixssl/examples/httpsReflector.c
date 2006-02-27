@@ -1,6 +1,6 @@
 /*
  *	httpReflector.c
- *	Release $Name: MATRIXSSL_1_2_5_OPEN $
+ *	Release $Name: MATRIXSSL_1_7_3_OPEN $
  *
  *	Simple example program for MatrixSSL
  *	Accepts a HTTPS request and echos the response back to the sender.
@@ -11,7 +11,8 @@
  *
  *	This software is open source; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
- *	the Free Software Foundation version 2.
+ *	the Free Software Foundation; either version 2 of the License, or
+ *	(at your option) any later version.
  *
  *	This General Public License does NOT permit incorporating this software 
  *	into proprietary programs.  If you are unable to comply with the GPL, a 
@@ -40,7 +41,6 @@
 #define HTTPS_PORT	4433
 static char keyfile[] = "privkeySrv.pem";
 static char certfile[] = "certSrv.pem";
-static char CAfile[] = "CAcertCln.pem";
 
 static const char responseHdr[] = "HTTP/1.0 200 OK\r\n"
 		"Server: PeerSec Networks MatrixSSL\r\n"
@@ -96,7 +96,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "matrixSslOpen failed, exiting...");
 	}
 
-	if (matrixSslReadKeys(&keys, certfile, keyfile, NULL, CAfile) < 0)  {
+	if (matrixSslReadKeys(&keys, certfile, keyfile, NULL, NULL) < 0)  {
 		fprintf(stderr, "Error reading or parsing %s or %s.\n", 
 			certfile, keyfile);
 		goto promptAndExit;
@@ -132,6 +132,7 @@ int main(int argc, char **argv)
 /*
 			sslAccept creates a new server session
 */
+			/* TODO - deadlock on blocking socket accept.  Should disable blocking here */
 			if ((fd = socketAccept(listenfd, &err)) == INVALID_SOCKET) {
 				fprintf(stdout, "Error accepting connection: %d\n", err);
 				continue;

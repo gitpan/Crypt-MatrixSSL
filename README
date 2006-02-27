@@ -1,4 +1,4 @@
-Crypt-MatrixSSL version 0.07
+Crypt-MatrixSSL version 1.73
 ============================
 
 Crypt::MatrixSSL lets you use the MatrixSSL crypto library (see
@@ -8,7 +8,7 @@ able to easily write SSL and TLS client and server programs.
 MatrixSSL includes everything you need, all in under 50KB.
 
 You will need a "C" compiler to build this, and it should build on
-(at least) Windows, Linux, and Macintosh machines.
+(at least) Windows, Linux, Unix, and Macintosh machines.
 
 MatrixSSL is an Open Source (GNU Public License) product, and is
 also available commercially if you need freedom from GNU rules.
@@ -37,7 +37,7 @@ http://www.gnu.org/copyleft/gpl.html
 
 Crypt::MatrixSSL uses MatrixSSL, and so inherits the same License.
 
-Copyright (C) 2005 by C. N. Drake <christopher@pobox.com>.
+Copyright (C) 2005,2006 by C. N. Drake <christopher@pobox.com>.
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself, either Perl version 5.8.3 or,

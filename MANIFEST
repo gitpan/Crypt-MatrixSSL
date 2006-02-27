@@ -18,18 +18,13 @@ privkeyCln.pem
 privkeySrv.pem
 META.yml		Version info etc
 matrixssl/ReadMe.txt	Subdirectory containing the source of "matrixssl-1-2-2.zip" downloaded on 17 Jan 2005 from www.matrixssl.org: http://www.matrixssl.org/download.html
-matrixssl/license.txt
-matrixssl/matrixSsl.h
 matrixssl/doc/MatrixSSLApi.pdf
 matrixssl/doc/MatrixSSLDeveloperGuide.pdf
 matrixssl/doc/MatrixSSLKeyGeneration.pdf
 matrixssl/doc/MatrixSSLPortingGuide.pdf
-matrixssl/doc/MatrixSSLReadme.pdf
+matrixssl/doc/MatrixSSLQuickStart.pdf
 matrixssl/doc/MatrixSSLSocketApi.pdf
-matrixssl/examples/CAcertCln.pem
 matrixssl/examples/CAcertSrv.pem
-matrixssl/examples/certCln.p12
-matrixssl/examples/certCln.pem
 matrixssl/examples/certSrv.p12
 matrixssl/examples/certSrv.pem
 matrixssl/examples/httpsClient.c
@@ -39,14 +34,16 @@ matrixssl/examples/httpsReflector.c
 matrixssl/examples/httpsReflector.sln
 matrixssl/examples/httpsReflector.vcproj
 matrixssl/examples/Makefile
-matrixssl/examples/privkeyCln.pem
 matrixssl/examples/privkeySrv.pem
 matrixssl/examples/sslSocket.c
 matrixssl/examples/sslSocket.h
+matrixssl/license.txt
+matrixssl/matrixCommon.h
+matrixssl/matrixSsl.h
 matrixssl/src/cipherSuite.c
 matrixssl/src/crypto/cryptoLayer.h
+matrixssl/src/crypto/matrixCrypto.h
 matrixssl/src/crypto/peersec/arc4.c
-matrixssl/src/crypto/peersec/asn1.c
 matrixssl/src/crypto/peersec/base64.c
 matrixssl/src/crypto/peersec/des3.c
 matrixssl/src/crypto/peersec/md2.c
@@ -61,11 +58,18 @@ matrixssl/src/matrixConfig.h
 matrixssl/src/matrixInternal.h
 matrixssl/src/matrixSsl.c
 matrixssl/src/matrixSsl.vcproj
+matrixssl/src/matrixSslStatic.vcproj
+matrixssl/src/os/debug.c
 matrixssl/src/os/linux/linux.c
 matrixssl/src/os/osLayer.h
 matrixssl/src/os/psMalloc.h
 matrixssl/src/os/vxworks/vxworks.c
 matrixssl/src/os/win/win.c
+matrixssl/src/pki/asn1.c
+matrixssl/src/pki/matrixPki.h
+matrixssl/src/pki/pkiInternal.h
+matrixssl/src/pki/rsaPki.c
+matrixssl/src/pki/x509.c
 matrixssl/src/sslDecode.c
 matrixssl/src/sslEncode.c
 matrixssl/src/sslv3.c

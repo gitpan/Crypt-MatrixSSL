@@ -1,6 +1,6 @@
 /*
  *	sslEncode.c
- *	Release $Name: MATRIXSSL_1_2_5_OPEN $
+ *	Release $Name: MATRIXSSL_1_7_3_OPEN $
  *
  *	Secure Sockets Layer message encoding
  */
@@ -10,7 +10,8 @@
  *
  *	This software is open source; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
- *	the Free Software Foundation version 2.
+ *	the Free Software Foundation; either version 2 of the License, or
+ *	(at your option) any later version.
  *
  *	This General Public License does NOT permit incorporating this software 
  *	into proprietary programs.  If you are unable to comply with the GPL, a 
@@ -53,7 +54,6 @@ static int32 writeClientKeyExchange(ssl_t *ssl, sslBuf_t *out);
 static int32 writeServerHello(ssl_t *ssl, sslBuf_t *out);
 static int32 writeServerHelloDone(ssl_t *ssl, sslBuf_t *out);
 #endif /* USE_SERVER_SIDE_SSL */
-
 
 static int32 sslWritePad(unsigned char *p, unsigned char padLen);
 static int32 secureWriteAdditions(ssl_t *ssl, int32 numRecs);
@@ -240,7 +240,7 @@ int32 sslEncodeResponse(ssl_t *ssl, sslBuf_t *out)
 			Send an empty certificate message in that case (or alert for SSLv3)
 */
 			if (ssl->flags & SSL_FLAGS_CLIENT_AUTH) {
-				if (ssl->sec.certMatch == 1) {
+				if (ssl->sec.certMatch > 0) {
 /*
 					Account for the certificate and certificateVerify messages
 */
@@ -285,7 +285,7 @@ int32 sslEncodeResponse(ssl_t *ssl, sslBuf_t *out)
 				This will also cover the NO_CERTIFICATE alert sent in
 				replacement of the NULL certificate message in SSLv3.
 */
-				if (ssl->sec.certMatch == 1) {
+				if (ssl->sec.certMatch > 0) {
 					messageSize += secureWriteAdditions(ssl, 4);
 				} else {
 					messageSize += secureWriteAdditions(ssl, 3);
@@ -670,7 +670,7 @@ static int32 writeCertificate(ssl_t *ssl, sslBuf_t *out, int32 notEmpty)
 	sslLocalCert_t	*cert;
 	unsigned char	*c, *end, *encryptStart;
 	char			padLen;
-	int32				totalCertLen, certLen, lsize, messageSize, i, rc;
+	int32			totalCertLen, certLen, lsize, messageSize, i, rc;
 
 	c = out->end;
 	end = out->buf + out->size;
@@ -829,7 +829,6 @@ static int32 writeFinished(ssl_t *ssl, sslBuf_t *out)
 		ssl->sec.cert = NULL;
 	}
 #endif /* USE_CLIENT_SIDE */
-	ssl->hsPool = NULL;
 	return SSL_SUCCESS;
 }
 
@@ -875,7 +874,7 @@ int32 matrixSslEncodeClientHello(ssl_t *ssl, sslBuf_t *out,
 {
 	unsigned char	*c, *end, *encryptStart;
 	char			padLen;
-	int32				messageSize, rc, cipherLen;
+	int32			messageSize, rc, cipherLen;
 	time_t			t;
 
 	if (ssl->flags & SSL_FLAGS_ERROR || ssl->flags & SSL_FLAGS_CLOSED) {

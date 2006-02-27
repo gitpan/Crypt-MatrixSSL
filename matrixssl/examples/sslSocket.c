@@ -1,6 +1,6 @@
 /*
  *	socketLayer.c
- *	Release $Name: MATRIXSSL_1_2_5_OPEN $
+ *	Release $Name: MATRIXSSL_1_7_1_OPEN $
  *
  *	Sample SSL socket layer for MatrixSSL example exectuables
  */
@@ -10,7 +10,8 @@
  *
  *	This software is open source; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
- *	the Free Software Foundation version 2.
+ *	the Free Software Foundation; either version 2 of the License, or
+ *	(at your option) any later version.
  *
  *	This General Public License does NOT permit incorporating this software 
  *	into proprietary programs.  If you are unable to comply with the GPL, a 
@@ -103,6 +104,12 @@ SOCKET socketAccept(SOCKET listenfd, int *err)
 	fd is the newly accepted socket. Disable Nagle on this socket.
 	Set blocking mode as default
 */
+/*	fprintf(stdout, "Connection received from %d.%d.%d.%d\n", 
+		addr.sin_addr.S_un.S_un_b.s_b1,
+		addr.sin_addr.S_un.S_un_b.s_b2,
+		addr.sin_addr.S_un.S_un_b.s_b3,
+		addr.sin_addr.S_un.S_un_b.s_b4);
+*/
 	setSocketNodelay(fd);
 	setSocketBlock(fd);
 	return fd;
@@ -178,9 +185,6 @@ int sslAccept(sslConn_t **cpp, SOCKET fd, sslKeys_t *keys,
 		sslFreeConnection(&conn);
 		return -1;
 	}
-	if (flags & SSL_FLAGS_CLIENT_AUTH) {
-		matrixSslSetCertValidator(conn->ssl, certValidator, NULL);
-	}
 /*
 	MatrixSSL doesn't provide buffers for data internally.  Define them
 	here to support buffered reading and writing for non-blocking sockets.
@@ -214,7 +218,7 @@ readMore:
 			goto readMore;
 		}
 	} else if (rc > 0) {
-		sslAssert(0);
+		socketAssert(0);
 		return -1;
 	} else {
 		fprintf(stderr, "sslRead error in sslAccept\n");
@@ -286,7 +290,7 @@ sslConn_t *sslDoHandshake(sslConn_t *conn, short cipherSuite)
 
 	bytes = matrixSslEncodeClientHello(conn->ssl, &conn->outsock, cipherSuite);
 	if (bytes < 0) {
-		sslAssert(bytes < 0);
+		socketAssert(bytes < 0);
 		goto error;
 	}
 /*
@@ -481,7 +485,7 @@ decodeMore:
 				goto readError;
 			}
 			cp->inbuf.start += bytes;
-			sslAssert(cp->inbuf.start == cp->inbuf.end);
+			socketAssert(cp->inbuf.start == cp->inbuf.end);
 /*
 			Can safely set back to non-blocking because we wouldn't
 			have got here if this socket wasn't non-blocking to begin with.
@@ -614,7 +618,7 @@ int sslWrite(sslConn_t *cp, char *buf, int len, int *status)
 	been completely sent.
 */
 	if (cp->outBufferCount > 0 && len != cp->outBufferCount) {
-		sslAssert(len != cp->outBufferCount);
+		socketAssert(len != cp->outBufferCount);
 		return -1;
 	}
 /*

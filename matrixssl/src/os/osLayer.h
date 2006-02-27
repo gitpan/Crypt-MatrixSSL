@@ -1,6 +1,6 @@
 /*
  *	osLayer.h
- *	Release $Name: MATRIXSSL_1_2_5_OPEN $
+ *	Release $Name: MATRIXSSL_1_7_3_OPEN $
  *	
  *	Layered header for OS specific functions
  *	Contributors adding new OS support must implement all functions 
@@ -12,7 +12,8 @@
  *
  *	This software is open source; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
- *	the Free Software Foundation version 2.
+ *	the Free Software Foundation; either version 2 of the License, or
+ *	(at your option) any later version.
  *
  *	This General Public License does NOT permit incorporating this software 
  *	into proprietary programs.  If you are unable to comply with the GPL, a 
@@ -32,6 +33,7 @@
 
 #ifndef _h_OS_LAYER
 #define _h_OS_LAYER
+#define _h_EXPORT_SYMBOLS
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,24 +47,8 @@ extern "C" {
 #endif
 
 /******************************************************************************/
-/*
-	Platform integer sizes.  Must match values in matrixSsl.h
-*/
-#ifndef MATRIX_INT32
-#define MATRIX_INT32
-typedef int int32;
-#endif
 
-#ifndef MATRIX_UINT32
-#define MATRIX_UINT32
-typedef unsigned int uint32;
-#endif
-
-#ifndef min
-#define min(a,b)	(((a) < (b)) ? (a) : (b))
-#endif
-
-#include "../matrixConfig.h"
+#include "../../matrixCommon.h"
 #include "psMalloc.h"
 
 /*
@@ -89,6 +75,13 @@ typedef CRITICAL_SECTION sslMutex_t;
 #elif LINUX
 #include <pthread.h>
 #include <string.h>
+
+/*
+	On some *NIX versions such as MAC OS X 10.4, CLK_TCK has been deprecated
+*/
+#ifndef CLK_TCK
+#define CLK_TCK		CLOCKS_PER_SEC
+#endif /* CLK_TCK */
 
 typedef pthread_mutex_t sslMutex_t;
 extern int32	sslCreateMutex(sslMutex_t *mutex);
@@ -167,6 +160,9 @@ extern int32		sslInitMsecs(sslTime_t *t);
 extern int32		sslCompareTime(sslTime_t a, sslTime_t b);
 extern int32		sslDiffSecs(sslTime_t then, sslTime_t now);
 extern long		sslDiffMsecs(sslTime_t then, sslTime_t now);
+
+extern int32 osGetUTCTime(psPool_t *pool, int32 days, char **utcTime,
+						  int32 *len);
 
 /******************************************************************************/
 /*

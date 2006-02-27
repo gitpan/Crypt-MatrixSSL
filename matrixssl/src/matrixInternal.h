@@ -1,6 +1,6 @@
 /*
  *	matrixInternal.h
- *	Release $Name: MATRIXSSL_1_2_5_OPEN $
+ *	Release $Name: MATRIXSSL_1_7_3_OPEN $
  *
  *	Internal header file used for the MatrixSSL implementation.
  *	Only modifiers of the library should be intersted in this file
@@ -11,7 +11,8 @@
  *
  *	This software is open source; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
- *	the Free Software Foundation version 2.
+ *	the Free Software Foundation; either version 2 of the License, or
+ *	(at your option) any later version.
  *
  *	This General Public License does NOT permit incorporating this software 
  *	into proprietary programs.  If you are unable to comply with the GPL, a 
@@ -31,19 +32,15 @@
 
 #ifndef _h_MATRIXINTERNAL
 #define _h_MATRIXINTERNAL
+#define _h_EXPORT_SYMBOLS
+
+#include "../matrixCommon.h"
 
 /******************************************************************************/
 /*
-	Include the configuration header to define the features we're using
+	At the highest SSL level.  Must include the lower level PKI
 */
-#include "matrixConfig.h"
-
-/******************************************************************************/
-/*
-	The top level source relies on the os and crypto layers.  Include them
-*/
-#include "os/osLayer.h"
-#include "crypto/cryptoLayer.h"
+#include "pki/pkiInternal.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -56,7 +53,6 @@ extern "C" {
 #define				MSG_NOSIGNAL	0
 #endif /* WIN32 */
 
-#define	SSL_FLAGS_SERVER		0x1		/* Must match value in matrixSsl.h */
 #define	SSL_FLAGS_READ_SECURE	0x2
 #define	SSL_FLAGS_WRITE_SECURE	0x4
 #define SSL_FLAGS_PUBLIC_SECURE	0x8
@@ -64,13 +60,8 @@ extern "C" {
 #define SSL_FLAGS_CLOSED		0x20
 #define SSL_FLAGS_NEED_ENCODE	0x40
 #define SSL_FLAGS_ERROR			0x80
-#define SSL_FLAGS_CLIENT_AUTH	0x200	/* Must match value in matrixSsl.h */
+#define SSL_FLAGS_ANON_CIPHER	0x1000
 	
-/*
-	matrixSslSetSessionOption defines
-*/
-#define	SSL_OPTION_DELETE_SESSION		0	/* Must match matrixSsl.h */
-
 #define SSL2_HEADER_LEN				2
 #define SSL3_HEADER_LEN				5
 #define SSL3_HANDSHAKE_HEADER_LEN	4
@@ -87,6 +78,7 @@ extern "C" {
 #define SSL_HS_HELLO_REQUEST		0
 #define SSL_HS_CLIENT_HELLO			1
 #define SSL_HS_SERVER_HELLO			2
+#define SSL_HS_HELLO_VERIFY_REQUEST	3
 #define SSL_HS_CERTIFICATE			11
 #define SSL_HS_SERVER_KEY_EXCHANGE	12
 #define SSL_HS_CERTIFICATE_REQUEST	13
@@ -141,69 +133,10 @@ extern "C" {
 
 
 /*
-	Return the length of padding bytes required for a record of 'LEN' bytes
-	The name Pwr2 indicates that calculations will work with 'BLOCKSIZE'
-	that are powers of 2.
-	Because of the trailing pad length byte, a length that is a multiple
-	of the pad bytes
-*/
-#define sslPadLenPwr2(LEN, BLOCKSIZE) \
-	BLOCKSIZE <= 1 ? (unsigned char)0 : \
-	(unsigned char)(BLOCKSIZE - ((LEN) & (BLOCKSIZE - 1)))
-
-/*
 	Round up the given length to the correct length with SSLv3 padding
 */
 #define sslRoundup018(LEN, BLOCKSIZE) \
 	BLOCKSIZE <= 1 ? BLOCKSIZE : (((LEN) + 8) & ~7)
-
-#ifndef max
-#define max(a,b)	(((a) > (b)) ? (a) : (b))
-#endif
-
-#ifndef min
-#define min(a,b)	(((a) < (b)) ? (a) : (b))
-#endif
-
-/******************************************************************************/
-
-/******************************************************************************/
-/*
-	Buffer structure
-*/
-#ifndef sslBuf_t
-/*
-	Empty buffer:
-     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5
-	|.|.|.|.|.|.|.|.|.|.|.|.|.|.|.|.|
-	 ^
-	 \end
-	 \start
-	 \buf
-	 size = 16
-	 len = (end - start) = 0
-
-	Buffer with data:
-
-     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5
-	|.|.|a|b|c|d|e|f|g|h|i|j|.|.|.|.|
-	 ^   ^                   ^
-	 |   |                   \end
-	 |   \start
-	 \buf
-	size = 16
-	len = (end - start) = 10
-
-	Read from start pointer
-	Write to end pointer
-*/
-typedef struct {
-	unsigned char	*buf;	/* Pointer to the start of the buffer */
-	unsigned char	*start;	/* Pointer to start of valid data */
-	unsigned char	*end;	/* Pointer to first byte of invalid data */
-	int32		size;			/* Size of buffer in bytes */
-} sslBuf_t;
-#endif
 
 /******************************************************************************/
 /*
@@ -254,6 +187,7 @@ typedef struct {
 
 	sslCipherContext_t	encryptCtx;
 	sslCipherContext_t	decryptCtx;
+	int32				anon;
 } sslSec_t;
 
 typedef struct {
@@ -280,20 +214,6 @@ typedef struct {
 	int32 (*verifyMac)(void *ssl, unsigned char type, unsigned char *data,
 		int32 len, unsigned char *mac);
 } sslCipherSpec_t;
-
-typedef struct sslLocalCert {
-	sslRsaKey_t			*privKey;
-	unsigned char		*certBin;
-	uint32		certLen;
-	struct sslLocalCert	*next;
-} sslLocalCert_t;
-
-typedef struct {
-	sslLocalCert_t		cert;
-#ifdef USE_CLIENT_SIDE_SSL
-	sslRsaCert_t		*caCerts;
-#endif /* USE_CLIENT_SIDE_SSL */
-} sslKeys_t;
 
 typedef struct ssl {
 	sslRec_t		rec;			/* Current SSL record information*/
@@ -343,10 +263,10 @@ typedef struct ssl {
 	unsigned char	deIvSize;
 	unsigned char	deBlockSize;
 
-	int32				flags;
-	int32				hsState;		/* Next expected handshake message type */
-	int32				err;			/* SSL errno of last api call */
-	int32				ignoredMessageCount;
+	int32			flags;
+	int32			hsState;		/* Next expected handshake message type */
+	int32			err;			/* SSL errno of last api call */
+	int32			ignoredMessageCount;
 
 	unsigned char	reqMajVer;
 	unsigned char	reqMinVer;
@@ -373,21 +293,12 @@ typedef struct {
 	int32				inUse;
 } sslSessionEntry_t;
 
+/******************************************************************************/
 /*
-	Include the public header here to define the public api calls
-	and public defines used internally.
-	Some of the types in the public header are duplicately defined, but
-	they are predicated on _h_MATRIXINTERNAL, which is defined by this file.
+	Have ssl_t and sslSessionId_t now for addition of the public api set
 */
 #include "../matrixSsl.h"
 
-/******************************************************************************/
-/*
-	No file system
-*/
-extern int32 matrixSslReadKeysMem(sslKeys_t **keys, char *certBuf, int32 certLen, 
-								char *privBuf, int32 privLen, char *privPass,
-								char *trustedCABuf, int32 trustedCALen);
 /******************************************************************************/
 /*
 	sslEncode.c and sslDecode.c
@@ -454,6 +365,11 @@ extern int32 ssl3HMACMd5(unsigned char *key, unsigned char *seq,
 #endif /* _h_MATRIXINTERNAL */
 
 /******************************************************************************/
+
+
+
+
+
 
 
 

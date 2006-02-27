@@ -2,7 +2,7 @@
 <VisualStudioProject
 	ProjectType="Visual C++"
 	Version="7.00"
-	Name="matrixSsl"
+	Name="matrixSslStatic"
 	ProjectGUID="{8DBF200C-313A-485B-97D8-892158882E16}"
 	Keyword="Win32Proj">
 	<Platforms>
@@ -14,7 +14,7 @@
 			Name="Debug|Win32"
 			OutputDirectory="Debug"
 			IntermediateDirectory="Debug"
-			ConfigurationType="2">
+			ConfigurationType="4">
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
@@ -23,7 +23,7 @@
 				ExceptionHandling="FALSE"
 				BasicRuntimeChecks="3"
 				SmallerTypeCheck="TRUE"
-				RuntimeLibrary="3"
+				RuntimeLibrary="5"
 				BufferSecurityCheck="TRUE"
 				EnableFunctionLevelLinking="TRUE"
 				WarningLevel="3"
@@ -33,12 +33,8 @@
 			<Tool
 				Name="VCCustomBuildTool"/>
 			<Tool
-				Name="VCLinkerTool"
-				OutputFile="$(OutDir)/libmatrixssl.dll"
-				IgnoreAllDefaultLibraries="FALSE"
-				ModuleDefinitionFile=""
-				GenerateDebugInformation="TRUE"
-				ResourceOnlyDLL="FALSE"/>
+				Name="VCLibrarianTool"
+				OutputFile="$(OutDir)/libmatrixstatic.lib"/>
 			<Tool
 				Name="VCMIDLTool"/>
 			<Tool
@@ -55,14 +51,12 @@ del &quot;$(OutDir)\libmatrixssl.lib&quot;
 				Name="VCResourceCompilerTool"/>
 			<Tool
 				Name="VCWebServiceProxyGeneratorTool"/>
-			<Tool
-				Name="VCWebDeploymentTool"/>
 		</Configuration>
 		<Configuration
 			Name="Release|Win32"
 			OutputDirectory="Release"
 			IntermediateDirectory="Release"
-			ConfigurationType="2">
+			ConfigurationType="4">
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="3"
@@ -72,18 +66,13 @@ del &quot;$(OutDir)\libmatrixssl.lib&quot;
 				PreprocessorDefinitions="WIN32;_WIN32_WINNT=0x0500"
 				StringPooling="TRUE"
 				ExceptionHandling="FALSE"
-				RuntimeLibrary="2"
+				RuntimeLibrary="4"
 				CompileAs="1"/>
 			<Tool
 				Name="VCCustomBuildTool"/>
 			<Tool
-				Name="VCLinkerTool"
-				AdditionalOptions="/FILEALIGN:512"
-				OutputFile="$(OutDir)/libmatrixssl.dll"
-				IgnoreAllDefaultLibraries="FALSE"
-				ModuleDefinitionFile=""
-				GenerateDebugInformation="FALSE"
-				ResourceOnlyDLL="FALSE"/>
+				Name="VCLibrarianTool"
+				OutputFile="$(OutDir)/libmatrixstatic.lib"/>
 			<Tool
 				Name="VCMIDLTool"/>
 			<Tool
@@ -100,8 +89,6 @@ del &quot;$(OutDir)\libmatrixssl.lib&quot;
 				Name="VCResourceCompilerTool"/>
 			<Tool
 				Name="VCWebServiceProxyGeneratorTool"/>
-			<Tool
-				Name="VCWebDeploymentTool"/>
 		</Configuration>
 	</Configurations>
 	<Files>
@@ -217,6 +204,18 @@ del &quot;$(OutDir)\libmatrixssl.lib&quot;
 				Filter="">
 				<File
 					RelativePath="pki\asn1.c">
+					<FileConfiguration
+						Name="Debug|Win32">
+						<Tool
+							Name="VCCLCompilerTool"
+							ObjectFile="$(IntDir)/$(InputName)1.obj"/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32">
+						<Tool
+							Name="VCCLCompilerTool"
+							ObjectFile="$(IntDir)/$(InputName)1.obj"/>
+					</FileConfiguration>
 				</File>
 				<File
 					RelativePath="pki\matrixPki.h">

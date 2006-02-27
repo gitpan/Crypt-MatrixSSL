@@ -1,6 +1,6 @@
 /*
  *	des3.c
- *	Release $Name: MATRIXSSL_1_2_5_OPEN $
+ *	Release $Name: MATRIXSSL_1_7_3_OPEN $
  *
  *	3DES block cipher implementation for low memory usage
  */
@@ -10,7 +10,8 @@
  *
  *	This software is open source; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
- *	the Free Software Foundation version 2.
+ *	the Free Software Foundation; either version 2 of the License, or
+ *	(at your option) any later version.
  *
  *	This General Public License does NOT permit incorporating this software 
  *	into proprietary programs.  If you are unable to comply with the GPL, a 
@@ -471,12 +472,12 @@ static void desfunc(ulong32 *block, const ulong32 *keys)
 	leftt ^= work;
 	right ^= (work << 8);
 
-	right = ROL(right, 1);
+	right = ROLc(right, 1);
 	work = (leftt ^ right) & 0xaaaaaaaaL;
 
 	leftt ^= work;
 	right ^= work;
-	leftt = ROL(leftt, 1);
+	leftt = ROLc(leftt, 1);
 #else /* SMALL_CODE */
 {
 	ulong64 tmp;
@@ -494,7 +495,7 @@ static void desfunc(ulong32 *block, const ulong32 *keys)
 #endif /* SMALL CODE */
 
 	for (cur_round = 0; cur_round < 8; cur_round++) {
-		work	= ROR(right, 4) ^ *keys++;
+		work	= RORc(right, 4) ^ *keys++;
 		leftt	^= SP7[work        & 0x3fL]
 				^ SP5[(work >>  8) & 0x3fL]
 				^ SP3[(work >> 16) & 0x3fL]
@@ -505,7 +506,7 @@ static void desfunc(ulong32 *block, const ulong32 *keys)
 				^  SP4[(work >> 16) & 0x3fL]
 				^  SP2[(work >> 24) & 0x3fL];
 
-		work	= ROR(leftt, 4) ^ *keys++;
+		work	= RORc(leftt, 4) ^ *keys++;
 		right	^= SP7[ work        & 0x3fL]
 				^  SP5[(work >>  8) & 0x3fL]
 				^  SP3[(work >> 16) & 0x3fL]
@@ -518,11 +519,11 @@ static void desfunc(ulong32 *block, const ulong32 *keys)
 	}
 
 #ifdef SMALL_CODE
-	right = ROR(right, 1);
+	right = RORc(right, 1);
 	work = (leftt ^ right) & 0xaaaaaaaaL;
 	leftt ^= work;
 	right ^= work;
-	leftt = ROR(leftt, 1);
+	leftt = RORc(leftt, 1);
 	work = ((leftt >> 8) ^ right) & 0x00ff00ffL;
 	right ^= work;
 	leftt ^= (work << 8);
@@ -636,6 +637,49 @@ int32 des3_keysize(int32 *desired_keysize)
     *desired_keysize = 24;
     return CRYPT_OK;
 }
+
+/******************************************************************************/
+/*
+	Generate a 3DES key given a password and salt value.
+	We use PKCS#5 2.0 PBKDF1 key derivation format with MD5 and count == 1 per:
+	http://www.rsasecurity.com/rsalabs/pkcs/pkcs-5/index.html
+
+	This key is compatible with the algorithm used by OpenSSL to encrypt keys
+	generated with 'openssl genrsa'.  If other encryption formats are used
+	(for example PBKDF2), or an iteration count > 0 is used, they are not 
+	compatible with this simple implementation.  OpenSSL provides many options
+	for converting key formats to the one used here.
+
+	A 3DES key is 24 bytes long, to generate it with this algorithm,
+	we md5 hash the password and salt for the first 16 bytes.  We then 
+	hash these first 16 bytes with the password and salt again, generating 
+	another 16 bytes.  We take the first 16 bytes and 8 of the second 16 to 
+	form the 24 byte key.
+
+	salt is assumed to point to 8 bytes of data
+	key is assumed to point to 24 bytes of data
+*/
+void generate3DESKey(unsigned char *pass, int32 passlen, unsigned char *salt, 
+					unsigned char *key)
+{
+	sslMd5Context_t		state;
+	unsigned char		md5[SSL_MD5_HASH_SIZE];
+
+	matrixMd5Init(&state);
+	matrixMd5Update(&state, pass, passlen);
+	matrixMd5Update(&state, salt, SSL_DES3_IV_LEN);
+	matrixMd5Final(&state, md5);
+	memcpy(key, md5, SSL_MD5_HASH_SIZE);
+
+	matrixMd5Init(&state);
+	matrixMd5Update(&state, md5, SSL_MD5_HASH_SIZE);
+	matrixMd5Update(&state, pass, passlen);
+	matrixMd5Update(&state, salt, SSL_DES3_IV_LEN);
+	matrixMd5Final(&state, md5);
+	memcpy(key + SSL_MD5_HASH_SIZE, md5, SSL_DES3_KEY_LEN - SSL_MD5_HASH_SIZE);
+}
+
+
 
 #ifdef PEERSEC_TEST
 

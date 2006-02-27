@@ -1,6 +1,6 @@
 /*
  *	base64.c
- *	Release $Name: MATRIXSSL_1_2_5_OPEN $
+ *	Release $Name: MATRIXSSL_1_7_3_OPEN $
  *
  *	Base64 operations
  */
@@ -10,7 +10,8 @@
  *
  *	This software is open source; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
- *	the Free Software Foundation version 2.
+ *	the Free Software Foundation; either version 2 of the License, or
+ *	(at your option) any later version.
  *
  *	This General Public License does NOT permit incorporating this software 
  *	into proprietary programs.  If you are unable to comply with the GPL, a 
@@ -70,13 +71,29 @@ int32 ps_base64_decode(const unsigned char *in,  uint32 len,
 		if (c == 255) {
 			continue;
 		}
-		if (c == 254) {
-			c = 0; g--;
+/*
+	the final = symbols are read and used to trim the remaining bytes
+ */
+	if (c == 254) {
+		c = 0;
+/*
+		prevent g < 0 which would potentially allow an overflow later
+ */
+		if (--g < 0) {
+			return CRYPT_INVALID_PACKET;
 		}
+	} else if (g != 3) {
+/*
+		we only allow = to be at the end
+ */
+		return CRYPT_INVALID_PACKET;
+	}
+
 		t = (t<<6)|c;
+
 		if (++y == 4) {
 			if (z + g > *outlen) { 
-				return -1;
+				return CRYPT_BUFFER_OVERFLOW;
 			}
 			out[z++] = (unsigned char)((t>>16)&255);
 			if (g > 1) {

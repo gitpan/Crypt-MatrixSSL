@@ -1,6 +1,6 @@
 /*
  *	socketLayer.h
- *	Release $Name: MATRIXSSL_1_2_5_OPEN $
+ *	Release $Name: MATRIXSSL_1_7_3_OPEN $
  *
  *	Sample SSL socket layer header for MatrixSSL
  */
@@ -10,7 +10,8 @@
  *
  *	This software is open source; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
- *	the Free Software Foundation version 2.
+ *	the Free Software Foundation; either version 2 of the License, or
+ *	(at your option) any later version.
  *
  *	This General Public License does NOT permit incorporating this software 
  *	into proprietary programs.  If you are unable to comply with the GPL, a 
@@ -92,7 +93,7 @@ extern "C" {
 #endif /* OS macros */
 
 extern void breakpoint();
-#define sslAssert(C) if (C) ; else {printf("%s:%d sslAssert(%s)\n",\
+#define socketAssert(C) if (C) ; else {printf("%s:%d sslAssert(%s)\n",\
 						__FILE__, __LINE__, #C); breakpoint(); }
 #ifndef min
 #define min(a,b)	(((a) < (b)) ? (a) : (b))

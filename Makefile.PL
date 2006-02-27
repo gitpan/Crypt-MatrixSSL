@@ -10,14 +10,17 @@ use ExtUtils::MakeMaker;
 # also laid the foundation for me getting it to work nicely on Linux and Macintosh
 #
 use Config;
+use IO::Socket ();	# For checking net connectivity
 my $os_src = ($^O =~ /Win32/) ? 'win/win' : 'linux/linux';
 my $o = $Config{obj_ext};
 my $c='.c';
 
+# clean up the online testing flag file.
+unlink("t/online.enabled"); 
 
-# NOTE: For future versions of MatrixSSL (this is v1-1-5) - you might need to do this;
-#       1. cd matrixssl
-#       2. make all
+# NOTE: For future versions of MatrixSSL (this is v1-7-3) - you might need to do this;
+#       1. cd matrixssl/src
+#       2. make all; cd ..
 #       3. find . -name '*.o' -print >/tmp/objs
 #       4. vi ../Makefile.PL
 #       5. include the file /tmp/objs - eg:   ":r /tmp/objs"
@@ -26,7 +29,10 @@ my $c='.c';
 #	8. join them all on to one line and assign them all to "$mxfiles"; be careful NOT to expand the "$mxext" (eg: use single quotes)
 #	9. replace the os/linux/linux$mxext one with os/$os_src$mxext
 
-my $mxfiles='matrixssl/src/crypto/peersec/arc4$mxext matrixssl/src/crypto/peersec/asn1$mxext matrixssl/src/crypto/peersec/base64$mxext matrixssl/src/crypto/peersec/des3$mxext matrixssl/src/crypto/peersec/md5$mxext matrixssl/src/crypto/peersec/md2$mxext matrixssl/src/crypto/peersec/mpi$mxext matrixssl/src/crypto/peersec/rsa$mxext matrixssl/src/crypto/peersec/sha1$mxext matrixssl/src/os/$os_src$mxext matrixssl/src/cipherSuite$mxext matrixssl/src/matrixSsl$mxext matrixssl/src/sslDecode$mxext matrixssl/src/sslEncode$mxext matrixssl/src/sslv3$mxext';
+
+my $mxfiles='matrixssl/src/crypto/peersec/arc4$mxext matrixssl/src/crypto/peersec/base64$mxext matrixssl/src/crypto/peersec/des3$mxext matrixssl/src/crypto/peersec/md5$mxext matrixssl/src/crypto/peersec/md2$mxext matrixssl/src/crypto/peersec/mpi$mxext matrixssl/src/crypto/peersec/rsa$mxext matrixssl/src/crypto/peersec/sha1$mxext matrixssl/src/os/$os_src$mxext matrixssl/src/os/debug$mxext matrixssl/src/pki/asn1$mxext matrixssl/src/pki/rsaPki$mxext matrixssl/src/pki/x509$mxext matrixssl/src/cipherSuite$mxext matrixssl/src/matrixSsl$mxext matrixssl/src/sslDecode$mxext matrixssl/src/sslEncode$mxext matrixssl/src/sslv3$mxext';	# matrixssl-1-7-3-open.tar.gz
+
+# This was for MatrixSSL.v1-1-5: my $mxfiles='matrixssl/src/crypto/peersec/arc4$mxext matrixssl/src/crypto/peersec/asn1$mxext matrixssl/src/crypto/peersec/base64$mxext matrixssl/src/crypto/peersec/des3$mxext matrixssl/src/crypto/peersec/md5$mxext matrixssl/src/crypto/peersec/md2$mxext matrixssl/src/crypto/peersec/mpi$mxext matrixssl/src/crypto/peersec/rsa$mxext matrixssl/src/crypto/peersec/sha1$mxext matrixssl/src/os/$os_src$mxext matrixssl/src/cipherSuite$mxext matrixssl/src/matrixSsl$mxext matrixssl/src/sslDecode$mxext matrixssl/src/sslEncode$mxext matrixssl/src/sslv3$mxext';
 
 $mxext=$o; my $mxobjs;eval('$mxobjs="' . $mxfiles . '"');	# These are all the object files we need for our release
 
@@ -177,13 +183,13 @@ WriteMakefile(
        AUTHOR     => 'C. N. Drake <christopher@pobox.com>') : ()),
     'LIBS'		=> [$libs], # e.g., '-lm'
     'DEFINE'		=> $defines, # e.g., '-DHAVE_SOMETHING'
-    'INC'		=> '-I.', # e.g., '-I. -I/usr/include/other'
+    'INC'		=> '-I. -Imatrixssl', # e.g., '-I. -I/usr/include/other'
 	# Un-comment this if you add C files to link with later:
     # 'OBJECT'		=> 'libmatrixssl.lib matrixssl/src/*.o MatrixSSL.o',
     # 'OBJECT'		=> "libmatrixssl.lib $mxobjs MatrixSSL.o", # link all the C files too
     'OBJECT'		=> "$mxobjs MatrixSSL$o", # link all the C files too
     # 'OBJECT'		=> '$(O_FILES)', # link all the C files too
-    clean               => {FILES => "$mxobjs Matrixssl$o"},
+    clean               => {FILES => "t/online.enabled $mxobjs Matrixssl$o"},
 );
 
 
@@ -211,6 +217,32 @@ else {
     copy ($fallback, $file) or die "Can't copy $fallback to $file: $!";
   }
 }
+
+
+
+
+#
+# Check if we have internet connection
+# (I lifted this code from Net::DNS, who got it from LWP... )
+#
+unless (defined $online_tests) {
+  my $s = IO::Socket::INET->new( PeerAddr => "www.google.com:80", Timeout  => 10 );
+  if ($s) {
+    close($s);
+    print "\n\nYou appear to be directly connected to the Internet.\n";
+    print "I have a test that grabs https://www.google.com/\n\n";
+    $online_tests = prompt("Do you want to enable this test?", "y") =~ /^y/i ? 1 : 0;
+  } # s
+}
+
+if ($online_tests) {
+  open(ENABLED, ">t/online.enabled") || die "Can't touch ./t/online.enabled $!";
+  close(ENABLED)                     || die "Can't touch ./t/online.enabled $!";
+}
+
+
+
+
 
 package MY;
 

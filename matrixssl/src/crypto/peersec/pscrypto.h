@@ -1,6 +1,6 @@
 /*
  *	pscrypto.h
- *	Release $Name: MATRIXSSL_1_2_5_OPEN $
+ *	Release $Name: MATRIXSSL_1_7_3_OPEN $
  *
  *	Internal definitions for PeerSec Networks MatrixSSL cryptography provider
  */
@@ -10,7 +10,8 @@
  *
  *	This software is open source; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
- *	the Free Software Foundation version 2.
+ *	the Free Software Foundation; either version 2 of the License, or
+ *	(at your option) any later version.
  *
  *	This General Public License does NOT permit incorporating this software 
  *	into proprietary programs.  If you are unable to comply with the GPL, a 
@@ -48,7 +49,7 @@ extern "C" {
 */
 #ifndef USE_INT64
 #define MP_16BIT
-#define USE_SLOW_MPI
+#define USE_SMALL_WORD
 #endif /* USE_INT64 */
 
 /******************************************************************************/
@@ -67,135 +68,16 @@ extern "C" {
 typedef unsigned long ulong32;
 
 /*
-	RSA
+	Primary RSA Key struct.  Define here for crypto
 */
-#define OID_RSA_MD2		646
-#define OID_RSA_MD5		648
-#define OID_RSA_SHA1	649
-
 typedef struct {
-	mp_int		e, d, N, qP, pQ, dP, dQ, p, q;
+	mp_int		e, d, N, qP, dP, dQ, p, q;
 	int32			size;	/* Size of the key in bytes */
 	int32			optimized; /* 1 for optimized */
 } sslRsaKey_t;
 
-/* typedef rsa_key sslRsaKey_t; */
-
-#define RSA_KEY_TYPE_PUBLIC 0
-#define RSA_KEY_TYPE_PRIVATE 1
-
-/*
-	8 bit bit masks for ASN.1 tag field
-*/
-#define ASN_PRIMITIVE			0x0
-#define ASN_CONSTRUCTED			0x20
-
-#define ASN_UNIVERSAL			0x0
-#define ASN_APPLICATION			0x40
-#define ASN_CONTEXT_SPECIFIC	0x80
-#define ASN_PRIVATE				0xC0
-
-/*
-	ASN.1 primitive data types
-*/
-enum {
-	ASN_BOOLEAN = 1,
-	ASN_INTEGER,
-	ASN_BIT_STRING,
-	ASN_OCTET_STRING,
-	ASN_NULL,
-	ASN_OID,
-	ASN_UTF8STRING = 12,
-	ASN_SEQUENCE = 16,
-	ASN_SET,
-	ASN_PRINTABLESTRING = 19,
-	ASN_T61STRING,
-	ASN_IA5STRING = 22,
-	ASN_UTCTIME,
-	ASN_GENERALIZEDTIME
-};
-
-/*
- *	APIs
- */
-extern int32 psAsnParsePrivateKey(psPool_t *pool, unsigned char **pp, int32 size, 
-								sslRsaKey_t *key);
-
-#ifdef USE_X509
-
-typedef struct {
-	char	*country;
-	char	*state;
-	char	*locality;
-	char	*organization;
-	char	*orgUnit;
-	char	*commonName;
-	char	hash[SSL_SHA1_HASH_SIZE];
-} DNattributes_t;
-
-typedef struct {
-	int32	ca;
-	int32	pathLenConstraint;
-} extBasicConstraints_t;
-
-typedef struct {
-	unsigned char	*dns;
-	unsigned char	*uri;
-	unsigned char	*email;
-} extSubjectAltName_t;
-
-typedef struct {
-	int32				len;
-	unsigned char	*id;
-} extSubjectKeyId_t;
-
-typedef struct {
-	int32				keyLen;
-	unsigned char	*keyId;
-	DNattributes_t	attribs;
-	int32				serialNum;
-} extAuthKeyId_t;
-/*
-	FUTURE:  add support for the other extensions
-*/
-typedef struct {
-	extBasicConstraints_t	bc;
-	extSubjectAltName_t		san;
-#ifdef USE_FULL_CERT_PARSE
-	extSubjectKeyId_t		sk;
-	extAuthKeyId_t			ak;
-	unsigned char			keyUsage;
-#endif /* USE_FULL_CERT_PARSE */
-} v3extensions_t;
-
-typedef struct sslRsaCert {
-	int32				version;
-	int32				valid;
-	unsigned char	*serialNumber;
-	int32				serialNumberLen;
-	DNattributes_t	issuer;
-	DNattributes_t	subject;
-	char			*notBefore;
-	char			*notAfter;
-	sslRsaKey_t		publicKey;
-	int32				certAlgorithm;
-	int32				sigAlgorithm;
-	int32				pubKeyAlgorithm;
-	unsigned char	*signature;
-	int32				signatureLen;
-	unsigned char	sigHash[SSL_SHA1_HASH_SIZE];
-	unsigned char	*uniqueUserId;
-	int32				uniqueUserIdLen;
-	unsigned char	*uniqueSubjectId;
-	int32				uniqueSubjectIdLen;
-	v3extensions_t	extensions;
-	struct sslRsaCert	*next;
-} sslRsaCert_t;
-
-extern int32 psAsnConfirmSignature(char *sigHash, unsigned char *sigOut,
-								 int32 sigLen);
-#endif /* USE_X509 */
 #endif /* USE_RSA */
+
 
 /*
  *	Private
@@ -208,6 +90,7 @@ extern int32 ps_base64_decode(const unsigned char *in, uint32 len,
  */
 extern void psZeromem(void *dst, size_t len);
 extern void psBurnStack(unsigned long len);
+
 
 /* max size of either a cipher/hash block or symmetric key [largest of the two] */
 #define MAXBLOCKSIZE			24
@@ -254,7 +137,6 @@ enum {
 /*
 	hash defines
  */
-
 struct sha1_state {
 #ifdef USE_INT64
 	ulong64		length;
@@ -279,10 +161,18 @@ struct md5_state {
 
 #ifdef USE_MD2
 struct md2_state {
-    unsigned char chksum[16], X[48], buf[16];
-    unsigned long curlen;
+	unsigned char chksum[16], X[48], buf[16];
+	unsigned long curlen;
 };
 #endif /* USE_MD2 */
+
+#ifdef USE_SHA256
+struct sha256_state {
+	ulong64 length;
+	ulong32 state[8], curlen;
+	unsigned char buf[64];
+};
+#endif /* USE_SHA256 */
 
 typedef union {
 	struct sha1_state	sha1;
@@ -290,6 +180,9 @@ typedef union {
 #ifdef USE_MD2
 	struct md2_state	md2;
 #endif /* USE_MD2 */
+#ifdef USE_SHA256
+	struct sha256_state sha256;
+#endif
 } hash_state;
 
 typedef hash_state sslSha1Context_t;
@@ -297,6 +190,17 @@ typedef hash_state sslMd5Context_t;
 #ifdef USE_MD2
 typedef hash_state sslMd2Context_t;
 #endif /* USE_MD2 */
+#ifdef USE_SHA256
+typedef hash_state sslSha256Context_t;
+#endif /* USE_SHA256 */
+
+typedef struct {
+	unsigned char	pad[64];
+	union {
+		sslMd5Context_t		md5;
+		sslSha1Context_t	sha1;
+	} u;
+} sslHmacContext_t;
 
 /******************************************************************************/
 /*
@@ -372,6 +276,7 @@ typedef union {
 	#define ENDIAN_LITTLE
 	#define ENDIAN_32BITWORD
 #endif
+
 
 /* #define ENDIAN_LITTLE */
 /* #define ENDIAN_BIG */
@@ -611,26 +516,54 @@ typedef union {
 #pragma intrinsic(_lrotr,_lrotl)
 #define ROR(x,n) _lrotr(x,n)
 #define ROL(x,n) _lrotl(x,n)
+#define RORc(x,n) _lrotr(x,n)
+#define ROLc(x,n) _lrotl(x,n)
 
 /*
-#elif defined(__GNUC__) && defined(__i386__)
+#elif defined(__GNUC__) && (defined(__i386__) || defined(__x86_64__)) && !defined(INTEL_CC) && !defined(PS_NO_ASM)
 
-static inline unsigned long ROL(unsigned long word, int32 i)
+static inline unsigned ROL(unsigned word, int32 i)
 {
-	__asm__("roll %%cl,%0"
-		:"=r" (word)
+	asm ("roll %%cl,%0"
 		:"0" (word),"c" (i));
 	return word;
 }
 
-static inline unsigned long ROR(unsigned long word, int32 i)
+static inline unsigned ROR(unsigned word, int32 i)
 {
-	__asm__("rorl %%cl,%0"
+	asm ("rorl %%cl,%0"
 		:"=r" (word)
 		:"0" (word),"c" (i));
 	return word;
 }
 */
+/*
+#ifndef PS_NO_ROLC
+
+static inline unsigned ROLc(unsigned word, const int32 i)
+{
+   asm ("roll %2,%0"
+      :"=r" (word)
+      :"0" (word),"I" (i));
+   return word;
+}
+
+static inline unsigned RORc(unsigned word, const int32 i)
+{
+   asm ("rorl %2,%0"
+      :"=r" (word)
+      :"0" (word),"I" (i));
+   return word;
+}
+
+#else
+
+#define ROLc ROL
+#define RORc ROR
+
+#endif
+*/
+
 #else /* _MSC_VER */
 
 /*
@@ -638,14 +571,72 @@ static inline unsigned long ROR(unsigned long word, int32 i)
  */
 #define ROL(x, y) ( (((unsigned long)(x)<<(unsigned long)((y)&31)) | (((unsigned long)(x)&0xFFFFFFFFUL)>>(unsigned long)(32-((y)&31)))) & 0xFFFFFFFFUL)
 #define ROR(x, y) ( ((((unsigned long)(x)&0xFFFFFFFFUL)>>(unsigned long)((y)&31)) | ((unsigned long)(x)<<(unsigned long)(32-((y)&31)))) & 0xFFFFFFFFUL)
+#define ROLc(x, y) ( (((unsigned long)(x)<<(unsigned long)((y)&31)) | (((unsigned long)(x)&0xFFFFFFFFUL)>>(unsigned long)(32-((y)&31)))) & 0xFFFFFFFFUL)
+#define RORc(x, y) ( ((((unsigned long)(x)&0xFFFFFFFFUL)>>(unsigned long)((y)&31)) | ((unsigned long)(x)<<(unsigned long)(32-((y)&31)))) & 0xFFFFFFFFUL)
 
 #endif /* _MSC_VER */
+
+/* 64-bit Rotates */
+#if 0
+
+#if defined(__GNUC__) && defined(__x86_64__) && !defined(PS_NO_ASM)
+
+static inline unsigned long ROL64(unsigned long word, int32 i)
+{
+   asm("rolq %%cl,%0"
+      :"=r" (word)
+      :"0" (word),"c" (i));
+   return word;
+}
+
+static inline unsigned long ROR64(unsigned long word, int32 i)
+{
+   asm("rorq %%cl,%0"
+      :"=r" (word)
+      :"0" (word),"c" (i));
+   return word;
+}
+
+#ifndef PS_NO_ROLC
+
+static inline unsigned long ROL64c(unsigned long word, const int32 i)
+{
+   asm("rolq %2,%0"
+      :"=r" (word)
+      :"0" (word),"J" (i));
+   return word;
+}
+
+static inline unsigned long ROR64c(unsigned long word, const int32 i)
+{
+   asm("rorq %2,%0"
+      :"=r" (word)
+      :"0" (word),"J" (i));
+   return word;
+}
+
+#else /* PS_NO_ROLC */
+
+#define ROL64c ROL
+#define ROR64c ROR
+
+#endif /* PS_NO_ROLC */
+#endif
+#endif /* commented out */
 
 #define ROL64(x, y) \
     ( (((x)<<((ulong64)(y)&63)) | \
       (((x)&CONST64(0xFFFFFFFFFFFFFFFF))>>((ulong64)64-((y)&63)))) & CONST64(0xFFFFFFFFFFFFFFFF))
 
 #define ROR64(x, y) \
+    ( ((((x)&CONST64(0xFFFFFFFFFFFFFFFF))>>((ulong64)(y)&CONST64(63))) | \
+      ((x)<<((ulong64)(64-((y)&CONST64(63)))))) & CONST64(0xFFFFFFFFFFFFFFFF))
+
+#define ROL64c(x, y) \
+    ( (((x)<<((ulong64)(y)&63)) | \
+      (((x)&CONST64(0xFFFFFFFFFFFFFFFF))>>((ulong64)64-((y)&63)))) & CONST64(0xFFFFFFFFFFFFFFFF))
+
+#define ROR64c(x, y) \
     ( ((((x)&CONST64(0xFFFFFFFFFFFFFFFF))>>((ulong64)(y)&CONST64(63))) | \
       ((x)<<((ulong64)(64-((y)&CONST64(63)))))) & CONST64(0xFFFFFFFFFFFFFFFF))
 
@@ -665,7 +656,7 @@ static inline unsigned long ROR(unsigned long word, int32 i)
 */
    #define byte(x, n) (((x) >> (8 * (n))) & 255)
 /*
-#endif 
+#endif
 */
 #ifdef __cplusplus
    }

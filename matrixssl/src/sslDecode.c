@@ -1,6 +1,6 @@
 /*
  *	sslDecode.c
- *	Release $Name: MATRIXSSL_1_2_5_OPEN $
+ *	Release $Name: MATRIXSSL_1_7_3_OPEN $
  *
  *	Secure Sockets Layer message decoding
  */
@@ -10,7 +10,8 @@
  *
  *	This software is open source; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
- *	the Free Software Foundation version 2.
+ *	the Free Software Foundation; either version 2 of the License, or
+ *	(at your option) any later version.
  *
  *	This General Public License does NOT permit incorporating this software 
  *	into proprietary programs.  If you are unable to comply with the GPL, a 
@@ -475,7 +476,7 @@ static int32 parseSSLHandshake(ssl_t *ssl, char *inbuf, int32 len)
 	unsigned char	*c;
 	unsigned char	*end;
 	unsigned char	hsType;
-	int32			hsLen, rc, parseLen = 0; 
+	int32			hsLen, rc, anonCheck, parseLen = 0; 
 	uint32			cipher = 0;
 	unsigned char	hsMsgHash[SSL_MD5_HASH_SIZE + SSL_SHA1_HASH_SIZE];
 
@@ -485,9 +486,12 @@ static int32 parseSSLHandshake(ssl_t *ssl, char *inbuf, int32 len)
 #endif /* USE_SERVER_SIDE_SSL */
 
 #ifdef USE_CLIENT_SIDE_SSL
-	int32			sessionIdLen, certMatch, certTypeLen;
+	int32				sessionIdLen, certMatch, certTypeLen;
+#endif /* USE_CLIENT_SIDE_SSL */
+
+#ifdef USE_CLIENT_SIDE_SSL
 	sslRsaCert_t	*cert, *currentCert, *subjectCert;
-	int32			i, certLen, certChainLen;
+	int32			valid, i, certLen, certChainLen;
 #endif /* USE_CLIENT_SIDE_SSL */
 
 
@@ -914,12 +918,8 @@ parseHandshake:
 		sslActivatePublicCipher(ssl);
 
 		pubKeyLen = hsLen;
-/*
-		As a server, we may have allocated a pool during the Certificate
-		step of client auth.  If not, allocate the pool here for the
-		RSA operations.
-*/
-		ssl->hsPool = NULL;
+
+
 		if (ssl->decryptPriv(ssl->hsPool, ssl->keys->cert.privKey, c, pubKeyLen,
 				ssl->sec.premaster, SSL_HS_PREMASTER_SIZE) != 
 				SSL_HS_PREMASTER_SIZE) {
@@ -927,6 +927,7 @@ parseHandshake:
 			matrixStrDebugMsg("Failed to decrypt premaster\n", NULL);
 			return SSL_ERROR;
 		}
+
 
 /*
 		The first two bytes of the decrypted message should be the client's 
@@ -1033,7 +1034,6 @@ parseHandshake:
 			ssl->sec.cert = NULL;
 		}
 #endif /* USE_CLIENT_SIDE */
-		ssl->hsPool = NULL;
 		break;
 
 #ifdef USE_CLIENT_SIDE_SSL
@@ -1171,7 +1171,9 @@ parseHandshake:
 			ssl->hsState = SSL_HS_CERTIFICATE;
 		}
 		break;
+#endif /* USE_CLIENT_SIDE_SSL */
 
+#ifdef USE_CLIENT_SIDE_SSL
 	case SSL_HS_CERTIFICATE: 
 
 		if (end - c < 3) {
@@ -1196,7 +1198,6 @@ parseHandshake:
 			matrixStrDebugMsg("Invalid Certificate message\n", NULL);
 			return SSL_ERROR;
 		}
-		ssl->hsPool = NULL;
 
 		i = 0;
 		while (certChainLen > 0) {
@@ -1233,7 +1234,9 @@ parseHandshake:
 		must be in order so that each subsequent one is the parent of the
 		previous.  Confirm this now.
 */
-		if (matrixX509ValidateChain(ssl->hsPool, ssl->sec.cert, &subjectCert) < 0) {
+		if (matrixX509ValidateCertChain(ssl->hsPool, ssl->sec.cert,
+				&subjectCert, &valid) < 0) {
+			ssl->err = SSL_ALERT_BAD_CERTIFICATE;
 			matrixStrDebugMsg("Couldn't validate certificate chain\n", NULL);
 			return SSL_ERROR;	
 		}
@@ -1242,7 +1245,8 @@ parseHandshake:
 		take the subject cert and make sure it is a self signed cert.
 */
 		if (matrixX509ValidateCert(ssl->hsPool, subjectCert, 
-			ssl->keys == NULL ? NULL : ssl->keys->caCerts) < 0) {
+				ssl->keys == NULL ? NULL : ssl->keys->caCerts,
+				&subjectCert->valid) < 0) {
 			ssl->err = SSL_ALERT_BAD_CERTIFICATE;
 			matrixStrDebugMsg("Error validating certificate\n", NULL);
 			return SSL_ERROR;
@@ -1255,12 +1259,24 @@ parseHandshake:
 		Call the user validation function with the entire cert chain.  The user
 		will proabably want to drill down to the last cert to make sure it
 		has been properly validated by a CA on this side.
+
+		Need to return from user validation space with knowledge
+		that this is an ANONYMOUS connection.
 */
-		if (matrixX509UserValidator(ssl->hsPool, ssl->sec.cert, 
-				ssl->sec.validateCert, ssl->sec.validateCertArg) < 0) {
+		if ((anonCheck = matrixX509UserValidator(ssl->hsPool, ssl->sec.cert, 
+				ssl->sec.validateCert, ssl->sec.validateCertArg)) < 0) {
 			ssl->err = SSL_ALERT_BAD_CERTIFICATE;
 			return SSL_ERROR;
 		}
+/*
+		Set the flag that is checked by the matrixSslGetAnonStatus API
+*/
+		if (anonCheck == SSL_ALLOW_ANON_CONNECTION) {
+			ssl->sec.anon = 1;
+		} else {
+			ssl->sec.anon = 0;
+		}
+
 /*
 		Either a client or server could have been processing the cert as part of
 		the authentication process.  If server, we move to the client key
@@ -1272,7 +1288,9 @@ parseHandshake:
 			ssl->hsState = SSL_HS_SERVER_HELLO_DONE;
 		}
 		break;
+#endif /* USE_CLIENT_SIDE_SSL */
 
+#ifdef USE_CLIENT_SIDE_SSL
 	case SSL_HS_SERVER_HELLO_DONE: 
 		if (hsLen != 0) {
 			ssl->err = SSL_ALERT_BAD_CERTIFICATE;
@@ -1339,6 +1357,7 @@ parseHandshake:
 
 
 	case SSL_HS_SERVER_KEY_EXCHANGE: 
+		/* FUTURE - implement for Diffie or Ephemeral RSA */
 		ssl->err = SSL_ALERT_UNEXPECTED_MESSAGE;
 		return SSL_ERROR;
 	default:

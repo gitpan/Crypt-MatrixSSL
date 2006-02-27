@@ -1,6 +1,6 @@
 /*	
  *	mpi.h
- *	Release $Name: MATRIXSSL_1_2_5_OPEN $
+ *	Release $Name: MATRIXSSL_1_7_3_OPEN $
  *
  *	multiple-precision integer library
  */
@@ -10,7 +10,8 @@
  *
  *	This software is open source; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
- *	the Free Software Foundation version 2.
+ *	the Free Software Foundation; either version 2 of the License, or
+ *	(at your option) any later version.
  *
  *	This General Public License does NOT permit incorporating this software 
  *	into proprietary programs.  If you are unable to comply with the GPL, a 
@@ -306,11 +307,6 @@ extern int32 mp_2expt(mp_int *a, int32 b);
  */
 
 /*
-	b = -a
- */
-extern int32 mp_neg(mp_int *a, mp_int *b);
-
-/*
 	b = |a|
  */
 extern int32 mp_abs(mp_int *a, mp_int *b);
@@ -339,8 +335,9 @@ extern int32 mp_sub(mp_int *a, mp_int *b, mp_int *c);
 	c = a * b
 	b = a*a
  */
-#ifdef USE_SLOW_MPI
+/* STEVE - moved mp_mul out of SLOW case */
 extern int32 mp_mul(psPool_t *pool, mp_int *a, mp_int *b, mp_int *c);
+#ifdef USE_SMALL_WORD
 extern int32 mp_sqr(psPool_t *pool, mp_int *a, mp_int *b);
 #endif
 
@@ -387,17 +384,9 @@ extern int32 mp_mulmod(psPool_t *pool, mp_int *a, mp_int *b, mp_int *c, mp_int *
 /*
 	c = 1/a (mod b)
  */
-#ifdef USE_SLOW_MPI
+#ifdef USE_SMALL_WORD
 extern int32 mp_invmod(psPool_t *pool, mp_int *a, mp_int *b, mp_int *c);
 #endif
-
-/*
-	Barrett Reduction, computes a (mod b) with a precomputed value c
-
-	Assumes that 0 < a <= b*b, note if 0 > a > -(b*b) then you can merely
-	compute the reduction as -1 * mp_reduce(mp_abs(a)) [pseudo code].
- */
-extern int32 mp_reduce(mp_int *a, mp_int *b, mp_int *c);
 
 /*
 	setups the montgomery reduction
@@ -413,7 +402,7 @@ extern int32 mp_montgomery_calc_normalization(mp_int *a, mp_int *b);
 /*
 	computes x/R == x (mod N) via Montgomery Reduction
  */
-#ifdef USE_SLOW_MPI
+#ifdef USE_SMALL_WORD
 extern int32 mp_montgomery_reduce(mp_int *a, mp_int *m, mp_digit mp);
 #endif
 
@@ -429,17 +418,17 @@ extern int32 mp_exptmod(psPool_t *pool, mp_int *a, mp_int *b, mp_int *c, mp_int 
 	Otherwise, we include the slow versions as well and which version to use
 	is done at runtime.
 */
-#ifdef USE_SLOW_MPI
+#ifdef USE_SMALL_WORD
 extern int32 s_mp_mul_digs(psPool_t *pool, mp_int *a, mp_int *b, mp_int *c,
 						   int32 digs);
-extern int32 s_mp_mul_high_digs(mp_int *a, mp_int *b, mp_int *c, int32 digs);
 extern int32 s_mp_sqr(psPool_t *pool, mp_int *a, mp_int *b);
 #else
 #define mp_montgomery_reduce fast_mp_montgomery_reduce
 #define mp_sqr	fast_s_mp_sqr
+#if STEVE
 #define mp_mul(P, A, B, C) fast_s_mp_mul_digs(P, A, B, C, (A)->used + (B)->used + 1)
+#endif
 #define s_mp_mul_digs	fast_s_mp_mul_digs
-#define s_mp_mul_high_digs	fast_s_mp_mul_high_digs
 #define mp_invmod	fast_mp_invmod
 #endif
 
@@ -454,17 +443,20 @@ extern int32 mp_read_unsigned_bin(mp_int *a, unsigned char *b, int32 c);
 extern int32 mp_to_unsigned_bin(psPool_t *pool, mp_int *a, unsigned char *b);
 
 extern int32 mp_signed_bin_size(mp_int *a);
-extern int32 mp_read_signed_bin(mp_int *a, unsigned char *b, int32 c);
-extern int32 mp_to_signed_bin(mp_int *a, unsigned char *b);
 
 /*
 	lowlevel functions, do not call!
  */
-#ifdef USE_SLOW_MPI
+#if STEVE
+#ifdef USE_SMALL_WORD
 #define s_mp_mul(P, A, B, C) s_mp_mul_digs(P, A, B, C, (A)->used + (B)->used + 1)
 #else
 #define s_mp_mul(P, A, B, C) sslAssert();
 #endif
+#endif /* STEVE */
+/* define this in all cases for now STEVE */
+#define s_mp_mul(P, A, B, C) s_mp_mul_digs(P, A, B, C, (A)->used + (B)->used + 1)
+
 
 /*
 	b = a*2
@@ -476,8 +468,8 @@ extern int32 s_mp_sub(mp_int *a, mp_int *b, mp_int *c);
 
 extern int32 fast_s_mp_mul_digs(psPool_t *pool, mp_int *a, mp_int *b, mp_int *c,
 								int32 digs);
-extern int32 fast_s_mp_mul_high_digs(mp_int *a, mp_int *b, mp_int *c, int32 digs);
 extern int32 fast_s_mp_sqr(psPool_t *pool, mp_int *a, mp_int *b);
+
 extern int32 fast_mp_invmod(psPool_t *pool, mp_int *a, mp_int *b, mp_int *c);
 extern int32 fast_mp_montgomery_reduce(mp_int *a, mp_int *m, mp_digit mp);
 

@@ -23,16 +23,19 @@ OBJECTS	= \
 		sslDecode$(O) \
 		sslEncode$(O) \
 		sslv3$(O) \
+		os/debug$(O) \
 		os/linux/linux$(O)	\
 		crypto/peersec/arc4$(O) \
-		crypto/peersec/asn1$(O) \
 		crypto/peersec/base64$(O) \
 		crypto/peersec/des3$(O) \
 		crypto/peersec/md5$(O) \
 		crypto/peersec/md2$(O) \
 		crypto/peersec/mpi$(O) \
 		crypto/peersec/rsa$(O) \
-		crypto/peersec/sha1$(O)
+		crypto/peersec/sha1$(O) \
+		pki/asn1$(O) \
+		pki/rsaPki$(O) \
+		pki/x509$(O)
 
 #
 #	Debug flags (Define MATRIXSSL_DEBUG in shell to build debug)
@@ -41,6 +44,7 @@ OBJECTS	= \
 #	tcsh:	setenv MATRIXSSL_DEBUG 1
 #			unsetenv MATRIXSSL_DEBUG
 #
+#MATRIXSSL_DEBUG = 1
 ifdef MATRIXSSL_DEBUG
 DFLAGS	= -g -Wall -Winline -Wdisabled-optimization -DDEBUG
 STRIP	= test
@@ -65,7 +69,7 @@ endif
 #	Compile options
 #
 SHARED	= -shared
-CFLAGS  = $(DFLAGS) -DLINUX -I./ -Icrypto/peersec
+CFLAGS  = $(DFLAGS) -DLINUX -I./
 LDFLAGS = -lc -lpthread
 
 #
@@ -95,12 +99,14 @@ compile: $(OBJECTS) $(LIBRARY) $(STATIC)
 #
 # Manual dependencies
 #
-*.o: ../matrixSsl.h matrixInternal.h matrixConfig.h Makefile
-os/*.o: matrixInternal.h matrixConfig.h Makefile os/osLayer.h
+*.o: ../matrixSsl.h ../matrixCommon.h matrixInternal.h matrixConfig.h Makefile
+os/*.o: matrixInternal.h matrixConfig.h Makefile os/osLayer.h os/psMalloc.h
 os/linux/*.o: matrixInternal.h matrixConfig.h Makefile os/osLayer.h
 crypto/peersec/*.o: matrixInternal.h matrixConfig.h Makefile \
-os/psMalloc.h crypto/peersec/mpi.h \
+					crypto/peersec/mpi.h \
 					crypto/cryptoLayer.h crypto/peersec/pscrypto.h
+pki/*.o: matrixInternal.h matrixConfig.h Makefile \
+			pki/matrixPki.h pki/pkiInternal.h
 #
 # Build the library
 #

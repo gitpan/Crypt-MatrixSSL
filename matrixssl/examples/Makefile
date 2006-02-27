@@ -83,7 +83,6 @@ $(REF_EXE):$(REF_OBJS)
 $(CLIENT_EXE):$(CLIENT_OBJS)
 	$(CC) -o $@ $^ $(LDFLAGS) $(LIBRARIES)
 
-
 #
 #	Clean up all generated files
 #

@@ -10,11 +10,12 @@ use ExtUtils::testlib;
 
 # change 'tests => 1' to 'tests => last_test_to_print';
 
-use Test::Simple tests => 42;
+use Test::More tests => 43;
 use strict;
 # BEGIN { plan tests => 9 };
 use Crypt::MatrixSSL;
 ok(1,'use'); # If we made it this far, we're ok. test 1
+use IO::Socket;		# For the online testing part
 
 #########################
 
@@ -50,8 +51,8 @@ my $smxkeys=333;
 $rc=333;
 
 # Read in our keys - not needed for clients who don't validate server certs.
-# $rc=Crypt::MatrixSSL::matrixSslReadKeys($smxkeys, $scertfile, $skeyfile, undef, $sCAfile);
-$rc=Crypt::MatrixSSL::matrixSslReadKeysMem($smxkeys, $keys{'scertfile'}, $keys{'skeyfile'}, undef, $keys{'sCAfile'});
+# API in 1.7.3 has changed - memory keys are now binary encoded, not ascii-armour anymore - $rc=Crypt::MatrixSSL::matrixSslReadKeysMem($smxkeys, $keys{'scertfile'}, $keys{'skeyfile'}, undef, $keys{'sCAfile'});
+$rc=Crypt::MatrixSSL::matrixSslReadKeys($smxkeys, $scertfile, $skeyfile, undef, $sCAfile);
 ok($rc==0,'matrixSslReadKeys');
 ok($smxkeys!=0,'matrixSslReadKeys1');
 ok($smxkeys!=333,'matrixSslReadKeys2');
@@ -235,6 +236,8 @@ $rc=Crypt::MatrixSSL::matrixSslDeleteSession($sssl);
 ok($rc==0,'matrixSslDeleteSession2');		# test ??
 print "matrixSslDeleteSession($sssl)='$rc'\n"  if($cdbg);
 
+
+
 # Free our keys
 $rc=Crypt::MatrixSSL::matrixSslFreeKeys($smxkeys);
 print "matrixSslFreeKeys($smxkeys)=$rc\n"  if($cdbg);
@@ -243,6 +246,25 @@ print "matrixSslFreeKeys($cmxkeys)=$rc\n"  if($cdbg);
 
 # Tidy up
 Crypt::MatrixSSL::matrixSslClose();
+
+
+SKIP: { skip "online tests are not enabled", 1 unless -e 't/online.enabled';
+
+	diag "";
+	diag "";
+	diag "\tLooking up https://www.google.com/ ...\n";
+
+	ok(&online_test(),'online tests');
+
+}
+
+
+
+
+
+
+
+
 
 unlink($skeyfile);
 unlink($ckeyfile);
@@ -270,6 +292,89 @@ sub showme {
 
 }
 
+
+sub online_test {
+  # This is basically a copy of the mxgg.pl sample program
+
+  my($rc,$host,$remote,$hc,$cssl,$cout,$cin,$b,$l,$error, $alertLevel,$alertDescription, $cssl,$cmxkeys,$csessionId,$flags, $cin2, $prevcin);
+
+=for testing:
+
+  "Opens" MatrixSSL
+  Opens a socket to google
+  Establishes SSL session
+  Issues an HTTP "GET /"
+  Reads response
+  exits.
+
+=cut
+
+$rc=Crypt::MatrixSSL::matrixSslOpen();
+$rc=Crypt::MatrixSSL::matrixSslReadKeys($cmxkeys, $ccertfile, $ckeyfile, undef, $cCAfile);
+$rc=Crypt::MatrixSSL::matrixSslNewSession($cssl, $cmxkeys, $csessionId, $flags);
+# Crypt::MatrixSSL::matrixSslSetCertValidator($cssl,0,0);
+
+
+$host="www.google.com:443";
+diag "Connecting to https://$host/ ...";
+$remote=new IO::Socket::INET(PeerAddr=>$host,Proto=>'tcp') || return 0; # die "sock:$!"; # Connect to a server
+
+diag "Writing hello ...";
+$rc=Crypt::MatrixSSL::matrixSslEncodeClientHello($cssl,$cout,0);if($rc){die "hello fail";} # in SSL, Clients talk 1st
+
+# SSL connections require some back-and-forth chatskis - this loop feeds MatrixSSL with the data until it says we're connected OK.
+diag "SSL Handshaking ...";
+while(($hc=Crypt::MatrixSSL::matrixSslHandshakeIsComplete($cssl))!=1) {
+  print "hc=$hc\n";
+  if(length($cout)) {
+    syswrite($remote,$cout); print "wrote bytes=" . length($cout) . "\n";
+    $b=sysread($remote,$cin,17000);
+    print "Read bytes=$b '${\showme($cin)}'\n";
+  } elsif($prevcin eq $cin) { # These 6 lines contributed by Alex Efros
+    $b=sysread($remote,$cin2,17000);
+    print "Read bytes=$b '${\showme($cin2)}'\n";
+    $cin.=$cin2;
+  }
+  $prevcin=$cin;
+  $rc=Crypt::MatrixSSL::matrixSslDecode($cssl, $cin, $cout, $error, $alertLevel, $alertDescription);
+  # Need to end if $rc hit an error
+  print "dec=$rc\n";
+  die "oops" if($l++>10);
+}
+
+
+# Our client is now going to send a message to the server
+diag "Requesting page ...";
+$rc=Crypt::MatrixSSL::matrixSslEncode($cssl, "GET / HTTP/1.1\r\nAccept: */*\r\nUser-Agent: Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1)\r\nHost: $host\r\n\r\n", $cout);
+syswrite($remote,$cout); print "wrote bytes=" . length($cout) . "\n" if(length($cout));
+
+
+# Wait for google to talk back to us:-
+diag "Reading response ...";
+$b=sysread($remote,$cin,17000); print "Read bytes=$b '${\showme($cin)}'\n";
+
+# Decrypt what it said:-
+$rc=Crypt::MatrixSSL::matrixSslDecode($cssl, $cin, $cout, $error, $alertLevel, $alertDescription);
+print "Read($rc): '$cout'\n";
+
+my $ret=0;
+$ret=1 if($cout=~/^(Content-Type:|Location:)/im);
+
+
+# Tell google we're about to go away now
+$rc=Crypt::MatrixSSL::matrixSslEncodeClosureAlert($cssl, $cout);
+syswrite($remote,$cout); print "wrote bytes=" . length($cout) . "\n" if(length($cout));
+
+
+# Clear up the finished session now
+$rc=Crypt::MatrixSSL::matrixSslDeleteSession($cssl);
+
+# Free our keys
+$rc=Crypt::MatrixSSL::matrixSslFreeKeys($cmxkeys);
+
+return $ret; # Worked
+
+}
 
 
 

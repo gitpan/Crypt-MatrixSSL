@@ -1,6 +1,6 @@
 /*
  *	httpClient.c
- *	Release $Name: MATRIXSSL_1_2_5_OPEN $
+ *	Release $Name: MATRIXSSL_1_7_3_OPEN $
  *
  *	Simple example program for MatrixSSL
  *	Sends a HTTPS request and echos the response back to the sender.
@@ -11,7 +11,8 @@
  *
  *	This software is open source; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
- *	the Free Software Foundation version 2.
+ *	the Free Software Foundation; either version 2 of the License, or
+ *	(at your option) any later version.
  *
  *	This General Public License does NOT permit incorporating this software 
  *	into proprietary programs.  If you are unable to comply with the GPL, a 
@@ -44,15 +45,13 @@
 #define HTTPS_PORT	4433
 #define HTTPS_IP	"127.0.0.1"
 
-static char keyfile[] = "privkeyCln.pem";
-static char certfile[] = "certCln.pem";
 static char CAfile[] = "CAcertSrv.pem";
 
 #define ITERATIONS	100 /* How many individual connections to make */
 #define REQUESTS	1  /* How many requests per each connection */
-#define REUSE		1  /* 0 if session resumption disabled */
+#define REUSE		0  /* 0 if session resumption disabled */
 
-#define ENFORCE_CERT_VALIDATION 0 /* 0 to allow connection without validation */
+#define ENFORCE_CERT_VALIDATION 1 /* 0 to allow connection without validation */
 
 
 static const char request[] = "GET / HTTP/1.0\r\n"
@@ -137,10 +136,10 @@ int main(int argc, char **argv)
 		ip = argv[1];
 		if (argc > 2) {
 			iterations = atoi(argv[2]);
-			sslAssert(iterations > 0);
+			socketAssert(iterations > 0);
 			if (argc > 3) {
 				requests = atoi(argv[3]);
-				sslAssert(requests > 0);
+				socketAssert(requests > 0);
 				if (argc > 4) {
 					cipherSuite = (short)atoi(argv[4]);
 				}
@@ -159,7 +158,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "matrixSslOpen failed, exiting...");
 	}
 	sessionId = NULL;
-	if (matrixSslReadKeys(&keys, certfile, keyfile, NULL, CAfile) < 0) {
+	if (matrixSslReadKeys(&keys, NULL, NULL, NULL, CAfile) < 0) {
 		goto promptAndExit;
 	}
 /*
@@ -338,6 +337,7 @@ static int certChecker(sslCertInfo_t *cert, void *arg)
 }	
 
 /******************************************************************************/
+
 
 
 

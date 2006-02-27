@@ -1,6 +1,6 @@
 /*
  *	matrixSsl.h
- *	Release $Name: MATRIXSSL_1_2_5_OPEN $
+ *	Release $Name: MATRIXSSL_1_7_3_OPEN $
  *	
  *	Public header file for MatrixSSL
  *	Implementations interacting with the matrixssl library should
@@ -12,7 +12,8 @@
  *
  *	This software is open source; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
- *	the Free Software Foundation version 2.
+ *	the Free Software Foundation; either version 2 of the License, or
+ *	(at your option) any later version.
  *
  *	This General Public License does NOT permit incorporating this software 
  *	into proprietary programs.  If you are unable to comply with the GPL, a 
@@ -38,19 +39,7 @@
  */  /* #endif
  */ 
 
-/******************************************************************************/
-/*
-	Platform integer sizes.  Must match values in osLayer.h
-*/
-#ifndef MATRIX_INT32
-#define MATRIX_INT32
-typedef int int32;
-#endif
-
-#ifndef MATRIX_UINT32
-#define MATRIX_UINT32
-typedef unsigned int uint32;
-#endif
+#include "matrixCommon.h"
 
 /******************************************************************************/
 /*
@@ -94,133 +83,66 @@ typedef unsigned int uint32;
 #define SSL_ALERT_CERTIFICATE_UNKNOWN		46
 #define SSL_ALERT_ILLEGAL_PARAMETER			47
 
-/******************************************************************************/
 /*
-	Typdefs required for public apis.  From an end user perspective, the 
-	sslBuf_t and sslCertInfo_t types have internal fields that are public,
-	but ssl_t, sslKeys_t, and sslSessionId_t do not.  Defining those as 'int32'
-	requires it to be treated as an opaque data type to be passed to public apis
+	Use as return code in user validation callback to allow
+	anonymous connections to proceed
 */
-#ifndef _h_MATRIXINTERNAL
-typedef struct {
-	unsigned char	*buf;	/* Pointer to the start of the buffer */
-	unsigned char	*start;	/* Pointer to start of valid data */
-	unsigned char	*end;	/* Pointer to first byte of invalid data */
-	int32			size;	/* Size of buffer in bytes */
-} sslBuf_t;
-
-/*
-	Information provided to user callback for validating certificates.
-	Register callback with call to matrixSslSetCertValidator
-*/
-typedef struct {
-	char	*country;
-	char	*state;
-	char	*locality;
-	char	*organization;
-	char	*orgUnit;
-	char	*commonName;
-} sslDistinguishedName_t;
-
-typedef struct {
-	char	*dns;
-	char	*uri;
-	char	*email;
-} sslSubjectAltName_t;
-
-typedef struct sslCertInfo {
-	int32					verified;
-	unsigned char			*serialNumber;
-	int32						serialNumberLen;
-	char					*notBefore;
-	char					*notAfter;
-	char					*sigHash;
-	int32					sigHashLen;
-	sslSubjectAltName_t		subjectAltName;
-	sslDistinguishedName_t	subject;
-	sslDistinguishedName_t	issuer;
-	struct sslCertInfo		*next;
-} sslCertInfo_t;
-
-typedef int32		ssl_t;
-typedef int32		sslKeys_t;
-typedef int32		sslSessionId_t;
-
-/*
-	Flag indicating server session in matrixSslNewSession
-*/
-#define	SSL_FLAGS_SERVER		0x1
-#define SSL_FLAGS_CLIENT_AUTH	0x200
-
-#define	SSL_OPTION_DELETE_SESSION		0
-
-/******************************************************************************/
-/*
-	Explicitly import these apis on Windows.  If we're being included from the
-	internal header, we export them instead!
-*/
-#ifdef WIN32
-#define SSLPUBLIC extern /*  __declspec(dllimport)
- */ 
-#endif /* WIN */
-#else /* _h_MATRIXINTERNAL */
-#ifdef WIN32
-#define SSLPUBLIC extern /*  __declspec(dllexport)
- */ 
-#endif /* WIN */
-#endif /* _h_MATRIXINTERNAL */
-#ifndef WIN32
-#define SSLPUBLIC extern
-#endif /* !WIN */
+#define	SSL_ALLOW_ANON_CONNECTION			67
 
 /******************************************************************************/
 /*
  *	Public API set
  */
-SSLPUBLIC int32	matrixSslOpen();
-SSLPUBLIC void	matrixSslClose();
+MATRIXPUBLIC int32	matrixSslOpen();
+MATRIXPUBLIC void	matrixSslClose();
 
-SSLPUBLIC int32	matrixSslReadKeys(sslKeys_t **keys, char *certFile,
+MATRIXPUBLIC int32	matrixSslReadKeys(sslKeys_t **keys, char *certFile,
 						char *privFile, char *privPass, char *trustedCAFile);
-SSLPUBLIC void	matrixSslFreeKeys(sslKeys_t *keys);
 
-SSLPUBLIC int32	matrixSslNewSession(ssl_t **ssl, sslKeys_t *keys,
+MATRIXPUBLIC int32	matrixSslReadKeysMem(sslKeys_t **keys, char *certBuf,
+						int32 certLen, char *privBuf, int32 privLen,
+						char *trustedCABuf, int32 trustedCALen);
+
+MATRIXPUBLIC void	matrixSslFreeKeys(sslKeys_t *keys);
+
+MATRIXPUBLIC int32	matrixSslNewSession(ssl_t **ssl, sslKeys_t *keys,
 						sslSessionId_t *session, int32 flags);
-SSLPUBLIC void	matrixSslDeleteSession(ssl_t *ssl);
+MATRIXPUBLIC void	matrixSslDeleteSession(ssl_t *ssl);
 
-SSLPUBLIC int32	matrixSslDecode(ssl_t *ssl, sslBuf_t *in, sslBuf_t *out, 
+MATRIXPUBLIC int32	matrixSslDecode(ssl_t *ssl, sslBuf_t *in, sslBuf_t *out, 
 						unsigned char *error, unsigned char *alertLevel,
 						unsigned char *alertDescription);
-SSLPUBLIC int32	matrixSslEncode(ssl_t *ssl, unsigned char *in, int32 inlen,
+MATRIXPUBLIC int32	matrixSslEncode(ssl_t *ssl, unsigned char *in, int32 inlen,
 						sslBuf_t *out);
-SSLPUBLIC int32	matrixSslEncodeClosureAlert(ssl_t *ssl, sslBuf_t *out);
+MATRIXPUBLIC int32	matrixSslEncodeClosureAlert(ssl_t *ssl, sslBuf_t *out);
 
-SSLPUBLIC int32	matrixSslHandshakeIsComplete(ssl_t *ssl);
+MATRIXPUBLIC int32	matrixSslHandshakeIsComplete(ssl_t *ssl);
 
-SSLPUBLIC void	matrixSslSetCertValidator(ssl_t *ssl,
-					int32 (*certValidator)(sslCertInfo_t *, void *arg),
-					void *arg);
+MATRIXPUBLIC void	matrixSslSetCertValidator(ssl_t *ssl,
+						int32 (*certValidator)(sslCertInfo_t *, void *arg),
+						void *arg);
 
-SSLPUBLIC void	matrixSslSetSessionOption(ssl_t *ssl, int32 option, void *arg);
+MATRIXPUBLIC void	matrixSslSetSessionOption(ssl_t *ssl, int32 option,
+						void *arg);
+MATRIXPUBLIC void	matrixSslGetAnonStatus(ssl_t *ssl, int32 *anonArg);
+MATRIXPUBLIC void	matrixSslAssignNewKeys(ssl_t *ssl, sslKeys_t *keys);
 
 /*
 	Client side APIs
 */
-SSLPUBLIC int32	matrixSslEncodeClientHello(ssl_t *ssl, sslBuf_t *out,
+MATRIXPUBLIC int32	matrixSslEncodeClientHello(ssl_t *ssl, sslBuf_t *out,
 						unsigned short cipherSpec);
 
-SSLPUBLIC int32	matrixSslGetSessionId(ssl_t *ssl, sslSessionId_t **sessionId);
-SSLPUBLIC void	matrixSslFreeSessionId(sslSessionId_t *sessionId);
+MATRIXPUBLIC int32	matrixSslGetSessionId(ssl_t *ssl,
+						sslSessionId_t **sessionId);
+MATRIXPUBLIC void	matrixSslFreeSessionId(sslSessionId_t *sessionId);
 
 /*
 	Server side APIs
 */
-SSLPUBLIC int32 matrixSslEncodeHelloRequest(ssl_t *ssl, sslBuf_t *out);
+MATRIXPUBLIC int32	matrixSslEncodeHelloRequest(ssl_t *ssl, sslBuf_t *out);
 
 
-SSLPUBLIC int32 matrixSslReadKeysMem(sslKeys_t **keys, char *certBuf, int32 certLen, 
-								char *privBuf, int32 privLen, char *privPass,
-								char *trustedCABuf, int32 trustedCALen);
 
 /******************************************************************************/
 
@@ -232,4 +154,5 @@ SSLPUBLIC int32 matrixSslReadKeysMem(sslKeys_t **keys, char *certBuf, int32 cert
 #endif /* _h_MATRIXSSL */
 
 /******************************************************************************/
+
 

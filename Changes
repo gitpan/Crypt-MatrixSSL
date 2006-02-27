@@ -29,3 +29,9 @@ Revision history for Perl extension Crypt::MatrixSSL.
 0.07  Wed May  4 23:28:55 GMT 2005
 	- Added matrixSslReadKeysMem (previously overlooked due to scarce documentation)
 	
+1.73  Mon Feb 27 15:07:38 GMT 2006
+	- Update to support MatrixSSL 1.7.3
+	- Picked a new version number to match the new underlying MatrixSSL version number
+	- Updated matrixSslReadKeysMem API change (itextPass is now unused)
+	- added changes suggested by Alex Efros to mxgg.pl 
+	- added online testing (grabs https://www.google.com/)

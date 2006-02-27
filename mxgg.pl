@@ -6,12 +6,12 @@ mxgg.pl - Sample MatrixSSL client which grabs the google.com https home page
 
 =head1 SYNOPSIS
 
-	perl mxpp.pl
+	perl mxpp.pl [www.sslhost.com[:443]]
 
 =head1 DESCRIPTION
 
   "Opens" MatrixSSL
-  Opens a socket to google
+  Opens a socket to your favorite SSL host (or www.google.com:443 if you don't specify one)
   Establishes SSL session
   Issues an HTTP "GET /"
   Reads response
@@ -45,7 +45,9 @@ Crypt::MatrixSSL::matrixSslNewSession($cssl, $cmxkeys, 0,0); if($rc){die "newses
 # We don't: MatrixSSL already can validate for us (if you've got the right cert files installed)
 # Crypt::MatrixSSL::matrixSslSetCertValidator($cssl,0,0);
 
-$host="www.google.com:443";
+$host=$ARGV[0];
+$host="www.google.com:443" unless($host);
+$host.=":443" unless($host=~/:/);
 $remote=new IO::Socket::INET(PeerAddr=>$host,Proto=>'tcp') || die "sock:$!"; # Connect to a server
 
 $rc=Crypt::MatrixSSL::matrixSslEncodeClientHello($cssl,$cout,0);if($rc){die "hello fail";} # in SSL, Clients talk 1st
@@ -57,7 +59,12 @@ while(($hc=Crypt::MatrixSSL::matrixSslHandshakeIsComplete($cssl))!=1) {
     syswrite($remote,$cout); print "wrote bytes=" . length($cout) . "\n";
     $b=sysread($remote,$cin,17000);
     print "Read bytes=$b '${\showme($cin)}'\n";
+  } elsif($prevcin eq $cin) { # These 6 lines contributed by Alex Efros
+    $b=sysread($remote,$cin2,17000);
+    print "Read bytes=$b '${\showme($cin2)}'\n";
+    $cin.=$cin2;
   }
+  $prevcin=$cin;
   $rc=Crypt::MatrixSSL::matrixSslDecode($cssl, $cin, $cout, $error, $alertLevel, $alertDescription);
   # Need to end if $rc hit an error
   print "dec=$rc\n";
@@ -76,6 +83,7 @@ $b=sysread($remote,$cin,17000); print "Read bytes=$b '${\showme($cin)}'\n";
 # Decrypt what it said:-
 $rc=Crypt::MatrixSSL::matrixSslDecode($cssl, $cin, $cout, $error, $alertLevel, $alertDescription);
 print "Read($rc): '$cout'\n";
+
 
 # Tell google we're about to go away now
 $rc=Crypt::MatrixSSL::matrixSslEncodeClosureAlert($cssl, $cout);

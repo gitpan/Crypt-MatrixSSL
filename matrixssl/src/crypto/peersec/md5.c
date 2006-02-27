@@ -1,6 +1,6 @@
 /*
  *	md5.c
- *	Release $Name: MATRIXSSL_1_2_5_OPEN $
+ *	Release $Name: MATRIXSSL_1_7_3_OPEN $
  *
  *	MD5 hash implementation
  */
@@ -10,7 +10,8 @@
  *
  *	This software is open source; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
- *	the Free Software Foundation version 2.
+ *	the Free Software Foundation; either version 2 of the License, or
+ *	(at your option) any later version.
  *
  *	This General Public License does NOT permit incorporating this software 
  *	into proprietary programs.  If you are unable to comply with the GPL, a 
@@ -35,6 +36,8 @@
 #define H(x,y,z)	(x^y^z)
 #define I(x,y,z)	(y^(x|(~z)))
 
+#ifdef SMALL_CODE
+
 #define FF(a,b,c,d,M,s,t) \
 	a = (a + F(b,c,d) + M + t); a = ROL(a, s) + b;
 
@@ -46,8 +49,6 @@
 
 #define II(a,b,c,d,M,s,t) \
 	a = (a + I(b,c,d) + M + t); a = ROL(a, s) + b;
-
-#ifdef SMALL_CODE
 
 static const unsigned char Worder[64] = {
 	0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,
@@ -82,6 +83,19 @@ static const ulong32 Korder[] = {
 	0xf7537e82UL, 0xbd3af235UL, 0x2ad7d2bbUL, 0xeb86d391UL,
 	0xe1f27f3aUL, 0xf5710fb0UL, 0xada0e5c4UL, 0x98e4c919UL
  };
+#else /* SMALL_CODE */
+
+#define FF(a,b,c,d,M,s,t) \
+	a = (a + F(b,c,d) + M + t); a = ROLc(a, s) + b;
+
+#define GG(a,b,c,d,M,s,t) \
+	a = (a + G(b,c,d) + M + t); a = ROLc(a, s) + b;
+
+#define HH(a,b,c,d,M,s,t) \
+	a = (a + H(b,c,d) + M + t); a = ROLc(a, s) + b;
+
+#define II(a,b,c,d,M,s,t) \
+    a = (a + I(b,c,d) + M + t); a = ROLc(a, s) + b;
 
 #endif /* SMALL_CODE */
 

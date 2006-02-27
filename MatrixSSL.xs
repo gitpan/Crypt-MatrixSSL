@@ -165,7 +165,6 @@ this difference: instead of passing the filename for the keys into the call,
 you instead pass a scalar containing the actual key info (same as would have
 been in the file).
 
-
 =cut
 
 int
@@ -211,7 +210,10 @@ matrixSslReadKeysMem(mxkeys, certDat, privDat, privPass, trustedCAcertDat)
 	if(strlen(iprivPass)==0) { iprivPass=NULL; }
 	if(strlen(itrustedCAcertDat)==0) { itrustedCAcertDat=NULL; }
 	/* Note: This takes advantage of perl's inbuilt string null-termination feature */
-        RETVAL = matrixSslReadKeysMem((sslKeys_t **)&mxkeys, icertDat,certDatlen, iprivDat,privDatlen, iprivPass, itrustedCAcertDat,trustedCAcertDatlen);
+        /* MatrixSSL v1.7.3 has removed the iprivPass paramater for whatever stupid reason - bad luck if you didn't want all your key info stored plaintext in your swap files... 
+	RETVAL = matrixSslReadKeysMem((sslKeys_t **)&mxkeys, icertDat,certDatlen, iprivDat,privDatlen, iprivPass, itrustedCAcertDat,trustedCAcertDatlen);
+	*/
+        RETVAL = matrixSslReadKeysMem((sslKeys_t **)&mxkeys, icertDat,certDatlen, iprivDat,privDatlen, itrustedCAcertDat,trustedCAcertDatlen);
     OUTPUT:
     	mxkeys
         RETVAL
@@ -321,7 +323,7 @@ matrixSslNewSession(ssl, mxkeys, sessionId, flags)
 	int sessionId
 	int flags
     CODE:
-        if(flags!=0) {flags=SSL_FLAGS_SERVER;sessionId=NULL;}
+        if(flags!=0) {flags=SSL_FLAGS_SERVER;sessionId=0;}
 	RETVAL = matrixSslNewSession((ssl_t **)&ssl, (sslKeys_t *)mxkeys, (sslSessionId_t *)sessionId, flags);
     OUTPUT:
     	ssl
