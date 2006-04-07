@@ -35,3 +35,11 @@ Revision history for Perl extension Crypt::MatrixSSL.
 	- Updated matrixSslReadKeysMem API change (itextPass is now unused)
 	- added changes suggested by Alex Efros to mxgg.pl 
 	- added online testing (grabs https://www.google.com/)
+
+1.8   Fri Apr 7 10:04:57 GMT 2006
+	- Update to support MatrixSSL 1.8
+	- Improved the perl client SSL socket handshaking in the examples
+	- Did a mini-benchmark: MatrixSSL managed:-
+		- 200 complete SSL connections per second
+		- 7500 SSL transactions per second (on established SSL sockets)
+		- Server=Dual 2.66ghz Xeon Fedora4, Client=Dual 2.2ghz Xeon RedHat ES3, Max CPU Utilisation was 50%

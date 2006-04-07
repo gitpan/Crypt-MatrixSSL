@@ -18,7 +18,7 @@ our @ISA = qw(Exporter);
 our %EXPORT_TAGS = ( 'all' => [ qw(
 
 mxSSL_SUCCESS mxSSL_ERROR mxSSL_FULL mxSSL_PARTIAL mxSSL_SEND_RESPONSE mxSSL_PROCESS_DATA mxSSL_ALERT mxSSL_FILE_NOT_FOUND
-matrixSslHandshakeIsComplete
+mxSSL_ALERT_CODES mxSSL_RETURN_CODES
 
 ) ] );
 
@@ -28,20 +28,51 @@ our @EXPORT = qw(
 	
 );
 
-our $VERSION = '1.73';
+our $VERSION = '1.8';
 
 require XSLoader;
 XSLoader::load('Crypt::MatrixSSL', $VERSION);
 
 # Preloaded methods go here.
-use constant mxSSL_SUCCESS	=>  0;	#/* Generic success */
+# Return codes from public apis. Not all apis return all codes.  See documentation for more details.
+use constant mxSSL_SUCCESS		=>  0;	#/* Generic success */
 use constant mxSSL_ERROR		=> -1;	#/* generic ssl error, see error code */
-use constant mxSSL_FULL		=> -2;	#/* must call sslRead before decoding */
-use constant mxSSL_PARTIAL	=> -3;	#/* more data reqired to parse full msg */
+use constant mxSSL_FULL			=> -2;	#/* must call sslRead before decoding */
+use constant mxSSL_PARTIAL		=> -3;	#/* more data reqired to parse full msg */
 use constant mxSSL_SEND_RESPONSE	=> -4;	#/* decode produced output data */
-use constant mxSSL_PROCESS_DATA	=> -5;	#/* succesfully decoded application data */
+use constant mxSSL_PROCESS_DATA		=> -5;	#/* succesfully decoded application data */
 use constant mxSSL_ALERT		=> -6;	#/* we've decoded an alert */
 use constant mxSSL_FILE_NOT_FOUND	=> -7;	#/* File not found */
+use constant mxSSL_MEM_ERROR		=> -8;	#/* Memory allocation failure */
+
+
+# SSL Alert levels and descriptions. This implementation treats all alerts as fatal.
+our %mxSSL_ALERT_CODES=(1 => 'SSL_ALERT_LEVEL_WARNING',
+			2 => 'SSL_ALERT_LEVEL_FATAL',
+			0 => 'SSL_ALERT_CLOSE_NOTIFY',
+			10=> 'SSL_ALERT_UNEXPECTED_MESSAGE',
+			20=> 'SSL_ALERT_BAD_RECORD_MAC',
+			30=> 'SSL_ALERT_DECOMPRESSION_FAILURE',
+			40=> 'SSL_ALERT_HANDSHAKE_FAILURE',
+			41=> 'SSL_ALERT_NO_CERTIFICATE',
+			42=> 'SSL_ALERT_BAD_CERTIFICATE',
+			43=> 'SSL_ALERT_UNSUPPORTED_CERTIFICATE',
+			44=> 'SSL_ALERT_CERTIFICATE_REVOKED',
+			45=> 'SSL_ALERT_CERTIFICATE_EXPIRED',
+			46=> 'SSL_ALERT_CERTIFICATE_UNKNOWN',
+			47=> 'SSL_ALERT_ILLEGAL_PARAMETER',
+			67=> 'SSL_ALLOW_ANON_CONNECTION'); # 67= /* Use as return code in user validation callback to allow anonymous connections to proceed */
+
+our %mxSSL_RETURN_CODES=( 0 => 'SSL_SUCCESS	Generic success',
+			 -1 => 'SSL_ERROR	generic ssl error, see error code',
+			 -2 => 'SSL_FULL	must call sslRead before decoding',
+			 -3 => 'SSL_PARTIAL	more data reqired to parse full msg',
+			 -4 => 'SSL_SEND_RESPONSE	decode produced output data',
+			 -5 => 'SSL_PROCESS_DATA	succesfully decoded application data',
+			 -6 => 'SSL_ALERT	weve decoded an alert',
+			 -7 => 'SSL_FILE_NOT_FOUND	File not found',
+			 -8 => 'SSL_MEM_ERROR	Memory allocation failure');
+
 
 # Old:-
 # BEGIN {

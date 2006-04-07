@@ -1,5 +1,5 @@
-Crypt-MatrixSSL version 1.73
-============================
+Crypt-MatrixSSL version 1.8
+===========================
 
 Crypt::MatrixSSL lets you use the MatrixSSL crypto library (see
 http://matrixssl.org/) from Perl.  With this module, you will be

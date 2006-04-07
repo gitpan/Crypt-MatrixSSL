@@ -6,10 +6,51 @@
 #include "mxSsl.h"
 
 
+/******************************************************************************/
+/*
+        Stub for a user-level certificate validator.  Just using
+        the default validation value here.
+*/
+static int certChecker(sslCertInfo_t *cert, void *arg)
+{
+        sslCertInfo_t   *next;
+
+	return 67;
+
+/*
+        Make sure we are checking the last cert in the chain
+*/
+        next = cert;
+        while (next->next != NULL) {
+                next = next->next;
+        }
+#ifdef ENFORCE_CERT_VALIDATION
+/*
+        This case passes the true RSA authentication status through
+*/
+        return next->verified;
+#else
+/*
+        This case passes an authenticated server through, but flags a
+        non-authenticated server correctly.  The user can call the
+        matrixSslGetAnonStatus later to see the status of this connection.
+*/
+        if (next->verified != 1) {
+                return 67; /* SSL_ALLOW_ANON_CONNECTION; */
+        }
+        return next->verified;
+#endif /* ENFORCE_CERT_VALIDATION */
+}
+
+/******************************************************************************/
+
+
+
 
 
 MODULE = Crypt::MatrixSSL		PACKAGE = Crypt::MatrixSSL		
 
+PROTOTYPES: ENABLE
 
 
 ##############################################################################################	
@@ -1045,7 +1086,7 @@ matrixSslSetCertValidator(session, callback, arg)
     CODE:
         printf("Warning: not implimented: matrixSslSetCertValidator(ssl_t *session, int (*certValidator)(sslCertInfo_t*, void *arg), void *arg);\n");
         printf("See http://aspn.activestate.com/ASPN/docs/ActivePerl/lib/Pod/perlcall.html for instructions on writing this\n");
-	matrixSslSetCertValidator((ssl_t *)session, 0, 0);
+	matrixSslSetCertValidator((ssl_t *)session, certChecker, NULL);
 
 	/* Here's the prototype we'll need:	int appCertValidator(sslCertInfo_t *certInfo, void *arg) */
 
@@ -1062,6 +1103,18 @@ hello()
         printf("Hello, world!\n");
 
 =cut
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

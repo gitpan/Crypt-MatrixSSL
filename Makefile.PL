@@ -14,23 +14,27 @@ use IO::Socket ();	# For checking net connectivity
 my $os_src = ($^O =~ /Win32/) ? 'win/win' : 'linux/linux';
 my $o = $Config{obj_ext};
 my $c='.c';
+my $mxbase='matrixssl-1-8-open';
 
 # clean up the online testing flag file.
 unlink("t/online.enabled"); 
 
-# NOTE: For future versions of MatrixSSL (this is v1-7-3) - you might need to do this;
+# NOTE: For future versions of MatrixSSL (this is v1-8) - you might need to do this;
 #       1. cd matrixssl/src
 #       2. make all; cd ..
 #       3. find . -name '*.o' -print >/tmp/objs
 #       4. vi ../Makefile.PL
 #       5. include the file /tmp/objs - eg:   ":r /tmp/objs"
 #	6. change all the ".o" endings to "$mxext"
-#	7. remove the leading "./" if any
+#	7. change all the leading "./" to $mxbase
 #	8. join them all on to one line and assign them all to "$mxfiles"; be careful NOT to expand the "$mxext" (eg: use single quotes)
 #	9. replace the os/linux/linux$mxext one with os/$os_src$mxext
 
 
-my $mxfiles='matrixssl/src/crypto/peersec/arc4$mxext matrixssl/src/crypto/peersec/base64$mxext matrixssl/src/crypto/peersec/des3$mxext matrixssl/src/crypto/peersec/md5$mxext matrixssl/src/crypto/peersec/md2$mxext matrixssl/src/crypto/peersec/mpi$mxext matrixssl/src/crypto/peersec/rsa$mxext matrixssl/src/crypto/peersec/sha1$mxext matrixssl/src/os/$os_src$mxext matrixssl/src/os/debug$mxext matrixssl/src/pki/asn1$mxext matrixssl/src/pki/rsaPki$mxext matrixssl/src/pki/x509$mxext matrixssl/src/cipherSuite$mxext matrixssl/src/matrixSsl$mxext matrixssl/src/sslDecode$mxext matrixssl/src/sslEncode$mxext matrixssl/src/sslv3$mxext';	# matrixssl-1-7-3-open.tar.gz
+
+my $mxfiles='$mxbase/src/crypto/peersec/arc4$mxext $mxbase/src/crypto/peersec/base64$mxext $mxbase/src/crypto/peersec/des3$mxext $mxbase/src/crypto/peersec/md5$mxext $mxbase/src/crypto/peersec/md2$mxext $mxbase/src/crypto/peersec/mpi$mxext $mxbase/src/crypto/peersec/rsa$mxext $mxbase/src/crypto/peersec/sha1$mxext $mxbase/src/os/$os_src$mxext $mxbase/src/os/debug$mxext $mxbase/src/pki/asn1$mxext $mxbase/src/pki/rsaPki$mxext $mxbase/src/pki/x509$mxext $mxbase/src/cipherSuite$mxext $mxbase/src/matrixSsl$mxext $mxbase/src/sslDecode$mxext $mxbase/src/sslEncode$mxext $mxbase/src/sslv3$mxext';	# matrixssl-1-8-open.tar.gz
+
+# This was for MatrixSSL.v1-7-3: my $mxfiles='matrixssl/src/crypto/peersec/arc4$mxext matrixssl/src/crypto/peersec/base64$mxext matrixssl/src/crypto/peersec/des3$mxext matrixssl/src/crypto/peersec/md5$mxext matrixssl/src/crypto/peersec/md2$mxext matrixssl/src/crypto/peersec/mpi$mxext matrixssl/src/crypto/peersec/rsa$mxext matrixssl/src/crypto/peersec/sha1$mxext matrixssl/src/os/$os_src$mxext matrixssl/src/os/debug$mxext matrixssl/src/pki/asn1$mxext matrixssl/src/pki/rsaPki$mxext matrixssl/src/pki/x509$mxext matrixssl/src/cipherSuite$mxext matrixssl/src/matrixSsl$mxext matrixssl/src/sslDecode$mxext matrixssl/src/sslEncode$mxext matrixssl/src/sslv3$mxext';	# matrixssl-1-7-3-open.tar.gz
 
 # This was for MatrixSSL.v1-1-5: my $mxfiles='matrixssl/src/crypto/peersec/arc4$mxext matrixssl/src/crypto/peersec/asn1$mxext matrixssl/src/crypto/peersec/base64$mxext matrixssl/src/crypto/peersec/des3$mxext matrixssl/src/crypto/peersec/md5$mxext matrixssl/src/crypto/peersec/md2$mxext matrixssl/src/crypto/peersec/mpi$mxext matrixssl/src/crypto/peersec/rsa$mxext matrixssl/src/crypto/peersec/sha1$mxext matrixssl/src/os/$os_src$mxext matrixssl/src/cipherSuite$mxext matrixssl/src/matrixSsl$mxext matrixssl/src/sslDecode$mxext matrixssl/src/sslEncode$mxext matrixssl/src/sslv3$mxext';
 
@@ -48,8 +52,8 @@ return '';
 
         return "
 
-libmatrixssl.lib: matrixssl/src/Makefile $mxc
-	cd matrixssl/src && \$(MAKE) all
+libmatrixssl.lib: $mxbase/src/Makefile $mxc
+	cd $mxbase/src && \$(MAKE) all
 	ar -rc libmatrixssl.lib $mxobjs
 
 ";
@@ -141,7 +145,7 @@ DLL - everything is instead put all inside the one DLL)
 my($win32)=0;		# Switch so we know if we're inside a win32-specific part of the header file
 my($line);
 
-open(MXIN,"<./matrixssl/matrixSsl.h") || die "./matrixssl/matrixSsl.h: $!";
+open(MXIN,"<./$mxbase/matrixSsl.h") || die "./$mxbase/matrixSsl.h: $!";
 open(MXOUT,">./mxSsl.h") || die "./mxSsl.h: $!";
 
 while($line=<MXIN>) {	# Read the incoming header file
@@ -183,7 +187,7 @@ WriteMakefile(
        AUTHOR     => 'C. N. Drake <christopher@pobox.com>') : ()),
     'LIBS'		=> [$libs], # e.g., '-lm'
     'DEFINE'		=> $defines, # e.g., '-DHAVE_SOMETHING'
-    'INC'		=> '-I. -Imatrixssl', # e.g., '-I. -I/usr/include/other'
+    'INC'		=> "-I. -I$mxbase", # e.g., '-I. -I/usr/include/other'
 	# Un-comment this if you add C files to link with later:
     # 'OBJECT'		=> 'libmatrixssl.lib matrixssl/src/*.o MatrixSSL.o',
     # 'OBJECT'		=> "libmatrixssl.lib $mxobjs MatrixSSL.o", # link all the C files too

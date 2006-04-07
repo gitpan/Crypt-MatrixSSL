@@ -127,6 +127,7 @@ my $trymore=20;
 my $hc=333;
 my $sout='';
 my $cin='';
+my $buf='';
 
 
 # Let the client and server talk amongst themselves to establish a connection
@@ -309,13 +310,16 @@ sub online_test {
 
 =cut
 
+$flags=0;
+
 $rc=Crypt::MatrixSSL::matrixSslOpen();
 $rc=Crypt::MatrixSSL::matrixSslReadKeys($cmxkeys, $ccertfile, $ckeyfile, undef, $cCAfile);
 $rc=Crypt::MatrixSSL::matrixSslNewSession($cssl, $cmxkeys, $csessionId, $flags);
-# Crypt::MatrixSSL::matrixSslSetCertValidator($cssl,0,0);
+Crypt::MatrixSSL::matrixSslSetCertValidator($cssl,0,0);
 
 
 $host="www.google.com:443";
+# $host="www.paypal.com:443";
 diag "Connecting to https://$host/ ...";
 $remote=new IO::Socket::INET(PeerAddr=>$host,Proto=>'tcp') || return 0; # die "sock:$!"; # Connect to a server
 
@@ -324,22 +328,40 @@ $rc=Crypt::MatrixSSL::matrixSslEncodeClientHello($cssl,$cout,0);if($rc){die "hel
 
 # SSL connections require some back-and-forth chatskis - this loop feeds MatrixSSL with the data until it says we're connected OK.
 diag "SSL Handshaking ...";
+my($decodeRc)=Crypt::MatrixSSL::mxSSL_PARTIAL;
 while(($hc=Crypt::MatrixSSL::matrixSslHandshakeIsComplete($cssl))!=1) {
-  print "hc=$hc\n";
-  if(length($cout)) {
-    syswrite($remote,$cout); print "wrote bytes=" . length($cout) . "\n";
-    $b=sysread($remote,$cin,17000);
-    print "Read bytes=$b '${\showme($cin)}'\n";
-  } elsif($prevcin eq $cin) { # These 6 lines contributed by Alex Efros
-    $b=sysread($remote,$cin2,17000);
-    print "Read bytes=$b '${\showme($cin2)}'\n";
-    $cin.=$cin2;
+  print "shake complete=$hc decodeRc=$decodeRc cin_len=" . length($cin) . " cout_len=" . length($cout) . "\n";
+  # if(($decodeRc==Crypt::MatrixSSL::mxSSL_SEND_RESPONSE)&&(length($cout)>0)) { # -4
+  if(length($cout)>0) {
+    $b=syswrite($remote,$cout); die "Socket error: $!" unless(defined($b));
+    $cout=substr($cout,$b); print "wrote bytes=$b, new cout_len=" . length($cout) . "\n";
   }
-  $prevcin=$cin;
-  $rc=Crypt::MatrixSSL::matrixSslDecode($cssl, $cin, $cout, $error, $alertLevel, $alertDescription);
-  # Need to end if $rc hit an error
-  print "dec=$rc\n";
-  die "oops" if($l++>10);
+  if(($decodeRc==Crypt::MatrixSSL::mxSSL_PARTIAL)||($decodeRc==Crypt::MatrixSSL::mxSSL_SEND_RESPONSE)) { # -3
+    $buf='';$b=sysread($remote,$buf,17000);$cin.=$buf;
+    print "Read bytes=$b new cin_len=" .length($cin) . " got: '${\showme($buf)}'\n"; $buf='';
+  } else {
+    print "'$decodeRc' != ' " . Crypt::MatrixSSL::mxSSL_PARTIAL . "'\n";
+  }
+  # elsif($prevcin eq $cin) { # These 6 lines contributed by Alex Efros
+  #  $b=sysread($remote,$cin2,17000);
+  #  print "A Read bytes=$b '${\showme($cin2)}'\n";
+  #  $cin.=$cin2;
+  #}
+  #$prevcin=$cin;
+
+  $decodeRc=-100;
+
+  while( ($decodeRc==-100) || (($decodeRc==0)&&(length($cin)>0))) { # !=Crypt::MatrixSSL::mxSSL_PARTIAL) { # -3  length($cin)>0) { #}
+  # while($decodeRc==0) { # !=Crypt::MatrixSSL::mxSSL_PARTIAL) { # -3  length($cin)>0) { #}
+    #print "cin len=" . length($cin) . "\n";
+    $decodeRc=Crypt::MatrixSSL::matrixSslDecode($cssl, $cin, $buf, $error, $alertLevel, $alertDescription);
+    print "matrixSslDecode rc=$decodeRc($Crypt::MatrixSSL::mxSSL_RETURN_CODES{$decodeRc}) cin_len=" . length($cin) . " cout_len=" . length($cout);
+    $cout.=$buf; $buf='';
+    # Need to end if $rc hit an error
+    if($decodeRc){ print " err=$error ($Crypt::MatrixSSL::mxSSL_ALERT_CODES{$error})"}; print "\n";
+    die "oops" if($l++>20);
+  }
+  die "oops" if($l++>20);
 }
 
 

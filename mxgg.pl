@@ -52,24 +52,34 @@ $remote=new IO::Socket::INET(PeerAddr=>$host,Proto=>'tcp') || die "sock:$!"; # C
 
 $rc=Crypt::MatrixSSL::matrixSslEncodeClientHello($cssl,$cout,0);if($rc){die "hello fail";} # in SSL, Clients talk 1st
 
+
+
+
 # SSL connections require some back-and-forth chatskis - this loop feeds MatrixSSL with the data until it says we're connected OK.
+my($decodeRc)=Crypt::MatrixSSL::mxSSL_PARTIAL;
 while(($hc=Crypt::MatrixSSL::matrixSslHandshakeIsComplete($cssl))!=1) {
   print "hc=$hc\n";
   if(length($cout)) {
-    syswrite($remote,$cout); print "wrote bytes=" . length($cout) . "\n";
-    $b=sysread($remote,$cin,17000);
-    print "Read bytes=$b '${\showme($cin)}'\n";
-  } elsif($prevcin eq $cin) { # These 6 lines contributed by Alex Efros
-    $b=sysread($remote,$cin2,17000);
-    print "Read bytes=$b '${\showme($cin2)}'\n";
-    $cin.=$cin2;
+    $b=syswrite($remote,$cout); die "Socket error: $!" unless(defined($b));
+    $cout=substr($cout,$b); print "wrote bytes=$b, new cout_len=" . length($cout) . "\n";
   }
-  $prevcin=$cin;
-  $rc=Crypt::MatrixSSL::matrixSslDecode($cssl, $cin, $cout, $error, $alertLevel, $alertDescription);
-  # Need to end if $rc hit an error
-  print "dec=$rc\n";
-  die "oops" if($l++>10);
+  if(($decodeRc==Crypt::MatrixSSL::mxSSL_PARTIAL)||($decodeRc==Crypt::MatrixSSL::mxSSL_SEND_RESPONSE)) { # -3
+    $buf='';$b=sysread($remote,$buf,17000);$cin.=$buf;
+    print "Read bytes=$b new cin_len=" .length($cin) . " got: '${\showme($buf)}'\n"; $buf='';
+  }
+
+  $decodeRc=-100;
+  while( ($decodeRc==-100) || (($decodeRc==0)&&(length($cin)>0))) {
+    $decodeRc=Crypt::MatrixSSL::matrixSslDecode($cssl, $cin, $buf, $error, $alertLevel, $alertDescription);
+    print "matrixSslDecode rc=$decodeRc($Crypt::MatrixSSL::mxSSL_RETURN_CODES{$decodeRc}) cin_len=" . length($cin) . " cout_len=" . length($cout);
+    $cout.=$buf; $buf='';
+    # Need to end if $rc hit an error
+    if($decodeRc){ print " err=$error ($Crypt::MatrixSSL::mxSSL_ALERT_CODES{$error})"}; print "\n";
+    die "oops" if($l++>20);
+  }
+  die "oops" if($l++>20);
 }
+
 
 
 # Our client is now going to send a message to the server
