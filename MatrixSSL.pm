@@ -4,90 +4,108 @@ use 5.006;
 use strict;
 use warnings;
 
-require Exporter;
-
-our @ISA = qw(Exporter);
-
-# Items to export into callers namespace by default. Note: do not export
-# names by default without a very good reason. Use EXPORT_OK instead.
-# Do not simply export all your public functions/methods/constants.
-
-# This allows declaration	use Crypt::MatrixSSL ':all';
-# If you do not need this, moving things directly into @EXPORT or @EXPORT_OK
-# will save memory.
-our %EXPORT_TAGS = ( 'all' => [ qw(
-
-mxSSL_SUCCESS mxSSL_ERROR mxSSL_FULL mxSSL_PARTIAL mxSSL_SEND_RESPONSE mxSSL_PROCESS_DATA mxSSL_ALERT mxSSL_FILE_NOT_FOUND
-mxSSL_ALERT_CODES mxSSL_RETURN_CODES
-
-) ] );
-
-our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
-
-our @EXPORT = qw(
-	
-);
-
-our $VERSION = '1.8';
+our $VERSION = '1.83';
 
 require XSLoader;
 XSLoader::load('Crypt::MatrixSSL', $VERSION);
 
-# Preloaded methods go here.
-# Return codes from public apis. Not all apis return all codes.  See documentation for more details.
-use constant mxSSL_SUCCESS		=>  0;	#/* Generic success */
-use constant mxSSL_ERROR		=> -1;	#/* generic ssl error, see error code */
-use constant mxSSL_FULL			=> -2;	#/* must call sslRead before decoding */
-use constant mxSSL_PARTIAL		=> -3;	#/* more data reqired to parse full msg */
-use constant mxSSL_SEND_RESPONSE	=> -4;	#/* decode produced output data */
-use constant mxSSL_PROCESS_DATA		=> -5;	#/* succesfully decoded application data */
-use constant mxSSL_ALERT		=> -6;	#/* we've decoded an alert */
-use constant mxSSL_FILE_NOT_FOUND	=> -7;	#/* File not found */
-use constant mxSSL_MEM_ERROR		=> -8;	#/* Memory allocation failure */
-
+sub import {
+    my $pkg = caller(0);
+    no strict 'refs';
+    *{$pkg.'::'.$_} = \&$_ for qw(
+        matrixSslOpen
+        matrixSslClose
+        matrixSslReadKeys
+        matrixSslReadKeysMem
+        matrixSslFreeKeys
+        matrixSslNewSession
+        matrixSslDeleteSession
+        matrixSslDecode
+        matrixSslEncode
+        matrixSslEncodeClosureAlert
+        matrixSslEncodeClientHello
+        matrixSslEncodeHelloRequest
+        matrixSslSetSessionOption
+        matrixSslHandshakeIsComplete
+        matrixSslGetSessionId
+        matrixSslFreeSessionId
+        matrixSslSetCertValidator
+        matrixSslGetAnonStatus
+        matrixSslAssignNewKeys
+        matrixSslSetResumptionFlag
+        matrixSslGetResumptionFlag
+    );
+    # export read-only scalar constants
+    eval "*{${pkg}::$_} = \\".(0+constant($_)) for qw(
+        SSL_ALLOW_ANON_CONNECTION
+        SSL_MAX_PLAINTEXT_LEN
+        SSL_FLAGS_SERVER
+        SSL_FLAGS_CLIENT_AUTH
+        SSL_OPTION_DELETE_SESSION
+        SSL_SUCCESS
+        SSL_ERROR
+        SSL_FULL
+        SSL_PARTIAL
+        SSL_SEND_RESPONSE
+        SSL_PROCESS_DATA
+        SSL_ALERT
+        SSL_FILE_NOT_FOUND
+        SSL_MEM_ERROR
+        SSL_ALERT_LEVEL_WARNING
+        SSL_ALERT_LEVEL_FATAL
+        SSL_ALERT_CLOSE_NOTIFY
+        SSL_ALERT_UNEXPECTED_MESSAGE
+        SSL_ALERT_BAD_RECORD_MAC
+        SSL_ALERT_DECOMPRESSION_FAILURE
+        SSL_ALERT_HANDSHAKE_FAILURE
+        SSL_ALERT_NO_CERTIFICATE
+        SSL_ALERT_BAD_CERTIFICATE
+        SSL_ALERT_UNSUPPORTED_CERTIFICATE
+        SSL_ALERT_CERTIFICATE_REVOKED
+        SSL_ALERT_CERTIFICATE_EXPIRED
+        SSL_ALERT_CERTIFICATE_UNKNOWN
+        SSL_ALERT_ILLEGAL_PARAMETER
+    );
+    # export hashes
+    *{$pkg.'::'.$_} = \%{$_} for qw(
+        SSL_alertLevel
+        SSL_alertDescription
+    );
+}
 
 # SSL Alert levels and descriptions. This implementation treats all alerts as fatal.
-our %mxSSL_ALERT_CODES=(1 => 'SSL_ALERT_LEVEL_WARNING',
-			2 => 'SSL_ALERT_LEVEL_FATAL',
-			0 => 'SSL_ALERT_CLOSE_NOTIFY',
-			10=> 'SSL_ALERT_UNEXPECTED_MESSAGE',
-			20=> 'SSL_ALERT_BAD_RECORD_MAC',
-			30=> 'SSL_ALERT_DECOMPRESSION_FAILURE',
-			40=> 'SSL_ALERT_HANDSHAKE_FAILURE',
-			41=> 'SSL_ALERT_NO_CERTIFICATE',
-			42=> 'SSL_ALERT_BAD_CERTIFICATE',
-			43=> 'SSL_ALERT_UNSUPPORTED_CERTIFICATE',
-			44=> 'SSL_ALERT_CERTIFICATE_REVOKED',
-			45=> 'SSL_ALERT_CERTIFICATE_EXPIRED',
-			46=> 'SSL_ALERT_CERTIFICATE_UNKNOWN',
-			47=> 'SSL_ALERT_ILLEGAL_PARAMETER',
-			67=> 'SSL_ALLOW_ANON_CONNECTION'); # 67= /* Use as return code in user validation callback to allow anonymous connections to proceed */
+our %SSL_alertLevel         = map { 0+constant($_) => $_ } qw(
+    SSL_ALERT_LEVEL_WARNING
+    SSL_ALERT_LEVEL_FATAL
+);
+our %SSL_alertDescription   = map { 0+constant($_) => $_ } qw(
+    SSL_ALERT_CLOSE_NOTIFY
+    SSL_ALERT_UNEXPECTED_MESSAGE
+    SSL_ALERT_BAD_RECORD_MAC
+    SSL_ALERT_DECOMPRESSION_FAILURE
+    SSL_ALERT_HANDSHAKE_FAILURE
+    SSL_ALERT_NO_CERTIFICATE
+    SSL_ALERT_BAD_CERTIFICATE
+    SSL_ALERT_UNSUPPORTED_CERTIFICATE
+    SSL_ALERT_CERTIFICATE_REVOKED
+    SSL_ALERT_CERTIFICATE_EXPIRED
+    SSL_ALERT_CERTIFICATE_UNKNOWN
+    SSL_ALERT_ILLEGAL_PARAMETER
+);
 
-our %mxSSL_RETURN_CODES=( 0 => 'SSL_SUCCESS	Generic success',
-			 -1 => 'SSL_ERROR	generic ssl error, see error code',
-			 -2 => 'SSL_FULL	must call sslRead before decoding',
-			 -3 => 'SSL_PARTIAL	more data reqired to parse full msg',
-			 -4 => 'SSL_SEND_RESPONSE	decode produced output data',
-			 -5 => 'SSL_PROCESS_DATA	succesfully decoded application data',
-			 -6 => 'SSL_ALERT	weve decoded an alert',
-			 -7 => 'SSL_FILE_NOT_FOUND	File not found',
-			 -8 => 'SSL_MEM_ERROR	Memory allocation failure');
+# for debug
+our %mxSSL_RETURN_CODES = (
+    0+constant('SSL_SUCCESS')       => 'SSL_SUCCESS	Generic success',
+    0+constant('SSL_ERROR')         => 'SSL_ERROR	generic ssl error, see error code',
+    0+constant('SSL_FULL')          => 'SSL_FULL	must call sslRead before decoding',
+    0+constant('SSL_PARTIAL')       => 'SSL_PARTIAL	more data reqired to parse full msg',
+    0+constant('SSL_SEND_RESPONSE') => 'SSL_SEND_RESPONSE	decode produced output data',
+    0+constant('SSL_PROCESS_DATA')  => 'SSL_PROCESS_DATA	succesfully decoded application data',
+    0+constant('SSL_ALERT')         => 'SSL_ALERT	weve decoded an alert',
+    0+constant('SSL_FILE_NOT_FOUND')=> 'SSL_FILE_NOT_FOUND	File not found',
+    0+constant('SSL_MEM_ERROR')     => 'SSL_MEM_ERROR	Memory allocation failure',
+);
 
-
-# Old:-
-# BEGIN {
-# 
-#   our %MX_RC=( # /* Return codes from public apis. Not all apis return all codes.  See documentation for more details.  */
-# 	  'SSL_SUCCESS'		=>  0,	#/* Generic success */
-# 	  'SSL_ERROR'		=> -1,	#/* generic ssl error, see error code */
-# 	  'SSL_FULL'		=> -2,	#/* must call sslRead before decoding */
-# 	  'SSL_PARTIAL'		=> -3,	#/* more data reqired to parse full msg */
-# 	  'SSL_SEND_RESPONSE'	=> -4,	#/* decode produced output data */
-# 	  'SSL_PROCESS_DATA'	=> -5,	#/* succesfully decoded application data */
-# 	  'SSL_ALERT'		=> -6,	#/* we've decoded an alert */
-# 	  'SSL_FILE_NOT_FOUND'	=> -7	#/* File not found */
-# 	 );
-# }
 
 1;
 __END__
@@ -97,14 +115,17 @@ __END__
 
 Crypt::MatrixSSL - Perl extension for SSL and TLS using MatrixSSL.org 
 
+
 =head1 SYNOPSIS
 
   use Crypt::MatrixSSL;
 
-  (See the MatrixSSL documentation, or the mxgg.pl sample script 
-   included in this package)
+  # 1. See the MatrixSSL documentation.
+  # 2. See scripts included in this package:
+  #     sample_ssl_client.pl
+  #     sample_ssl_server.pl
+  #     sample_functions.pl
 
-  Some documentation is also included in POD format in the .xs file. 
 
 =head1 DESCRIPTION
 
@@ -127,20 +148,184 @@ MatrixSSL "C" code if you like (it's in the directory "./matrixssl"
 of this package if you want to replace the included version from
 the MatrixSSL.org download site.)
 
+
 =head2 EXPORT
 
-None by default.
+=head3 FUNCTIONS EXPORTED BY DEFAULT
+
+See MatrixSSL documentations about these functions. This documentation will
+describe only differences between original C interface provided by MatrixSSL
+and Perl interface provided by this module (see below).
+
+ matrixSslOpen()
+ matrixSslClose()
+ matrixSslReadKeys()
+ matrixSslReadKeysMem()
+ matrixSslFreeKeys()
+ matrixSslNewSession()
+ matrixSslDeleteSession()
+ matrixSslDecode()
+ matrixSslEncode()
+ matrixSslEncodeClosureAlert()
+ matrixSslEncodeClientHello()
+ matrixSslEncodeHelloRequest()
+ matrixSslSetSessionOption()
+ matrixSslHandshakeIsComplete()
+ matrixSslGetSessionId()
+ matrixSslFreeSessionId()
+ matrixSslSetCertValidator()
+ matrixSslGetAnonStatus()
+ matrixSslAssignNewKeys()
+ matrixSslSetResumptionFlag()
+ matrixSslGetResumptionFlag()
+
+=head3 CONSTANTS EXPORTED BY DEFAULT
+
+Return code in user validation callback:
+
+ $SSL_ALLOW_ANON_CONNECTION
+
+Max size for message in matrixSslEncode():
+
+ $SSL_MAX_PLAINTEXT_LEN
+
+Flags for matrixSslNewSession():
+
+ $SSL_FLAGS_SERVER
+ $SSL_FLAGS_CLIENT_AUTH
+
+Options for matrixSslSetSessionOption():
+
+ $SSL_OPTION_DELETE_SESSION
+
+matrixSslDecode() return values:
+
+ $SSL_SUCCESS
+ $SSL_ERROR
+ $SSL_FULL
+ $SSL_PARTIAL
+ $SSL_SEND_RESPONSE
+ $SSL_PROCESS_DATA
+ $SSL_ALERT
+ $SSL_FILE_NOT_FOUND
+ $SSL_MEM_ERROR
+
+matrixSslDecode() alertLevel:
+
+ $SSL_ALERT_LEVEL_WARNING
+ $SSL_ALERT_LEVEL_FATAL
+
+matrixSslDecode() alertDescription:
+
+ $SSL_ALERT_CLOSE_NOTIFY
+ $SSL_ALERT_UNEXPECTED_MESSAGE
+ $SSL_ALERT_BAD_RECORD_MAC
+ $SSL_ALERT_DECOMPRESSION_FAILURE
+ $SSL_ALERT_HANDSHAKE_FAILURE
+ $SSL_ALERT_NO_CERTIFICATE
+ $SSL_ALERT_BAD_CERTIFICATE
+ $SSL_ALERT_UNSUPPORTED_CERTIFICATE
+ $SSL_ALERT_CERTIFICATE_REVOKED
+ $SSL_ALERT_CERTIFICATE_EXPIRED
+ $SSL_ALERT_CERTIFICATE_UNKNOWN
+ $SSL_ALERT_ILLEGAL_PARAMETER
+
+=head3 HASHES EXPORT BY DEFAULT
+
+ %SSL_alertLevel
+ %SSL_alertDescription
 
 
+=head1 FUNCTIONS
+
+=over
+
+=item B<matrixSslDecode>( $ssl, $inBuf, $outBuf, $error, $alertLevel, $alertDescription )
+
+$inBuf and $outBuf are usual string scalars, not (sslBuf_t *) as in C interface.
+
+After succesfull decoding one packet, matrixSslDecode() will cut decoded
+packet from $inBuf's beginning.
+
+Reply SSL packets or application data will be appended to $outBuf, if any.
+
+To convert error/alert codes into text use exported hashes:
+
+ $SSL_alertDescription{ $error }
+ $SSL_alertLevel{ $alertLevel }
+ $SSL_alertDescription{ $alertDescription }
+
+
+=item B<matrixSslEncode>( $ssl, $inBuf, $outBuf )
+
+=item B<matrixSslEncodeClosureAlert>( $ssl, $outBuf )
+
+=item B<matrixSslEncodeClientHello>( $ssl, $outBuf, $cipherSuite )
+
+=item B<matrixSslEncodeHelloRequest>( $ssl, $outBuf )
+
+$outBuf in all matrixSslEncode* functions is usual string scalar,
+not (sslBuf_t *) as in C interface.
+
+Encoded SSL packet will be appended to $outBuf.
+
+If you need to matrixSslEncode() huge $inBuf, then you should split $inBuf
+into strings with size <= $SSL_MAX_PLAINTEXT_LEN and call matrixSslEncode()
+for each of these strings. If you don't do this matrixSslEncode() will return
+one of these errors: $SSL_ERROR, $SSL_FULL or matrixSslDecode() on other side
+will return $SSL_ERROR.
+
+
+=item B<matrixSslSetCertValidator>( $ssl, \&cb, $cb_arg )
+
+While interface of this function is same as in C, there some important notes
+about perl callback \&cb. Perl callback will be called with two scalar params:
+$certInfo and $cb_arg - just like in C.
+
+But $certInfo instead of (sslCertInfo_t *) will contain reference to array
+with certificates. Each certificate will be hash in this format:
+
+ verified       => $verified,
+ notBefore      => $notBefore,
+ notAfter       => $notAfter,
+ subjectAltName => {
+                dns             => $dns,
+                uri             => $uri,
+                email           => $email,
+                },
+ subject        => {
+                country         => $country,
+                state           => $state,
+                locality        => $locality,
+                organization    => $organization,
+                orgUnit         => $orgUnit,
+                commonName      => $commonName,
+                },
+ issuer         => {
+                country         => $country,
+                state           => $state,
+                locality        => $locality,
+                organization    => $organization,
+                orgUnit         => $orgUnit,
+                commonName      => $commonName,
+                },
+
+This callback must return single scalar with integer value (as described in
+MatrixSSL documentation). If callback die(), then warning will be printed,
+and execution will continue assuming callback returned -1.
+
+
+=back
 
 =head1 SEE ALSO
 
 http://www.MatrixSSL.org - the download from this site includes
 simple yet comprehensive documentation in PDF format.
 
-=head1 AUTHOR
+=head1 AUTHORS
 
 C. N. Drake, E<lt>christopher@pobox.comE<gt>
+Alex Efros
 
 =head1 COPYRIGHT AND LICENSE
 

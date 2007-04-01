@@ -31,7 +31,7 @@ my($rc)=333;	# Set the return code to an unlikley value
 
 
 # Open the lib (most calls that work should return 0)
-$rc=Crypt::MatrixSSL::matrixSslOpen(); 
+$rc=matrixSslOpen(); 
 ok($rc==0,'matrixSslOpen');
 print "matrixSslOpen() returns '$rc'\n" if($cdbg);
 
@@ -51,8 +51,8 @@ my $smxkeys=333;
 $rc=333;
 
 # Read in our keys - not needed for clients who don't validate server certs.
-# API in 1.7.3 has changed - memory keys are now binary encoded, not ascii-armour anymore - $rc=Crypt::MatrixSSL::matrixSslReadKeysMem($smxkeys, $keys{'scertfile'}, $keys{'skeyfile'}, undef, $keys{'sCAfile'});
-$rc=Crypt::MatrixSSL::matrixSslReadKeys($smxkeys, $scertfile, $skeyfile, undef, $sCAfile);
+# API in 1.7.3 has changed - memory keys are now binary encoded, not ascii-armour anymore - $rc=matrixSslReadKeysMem($smxkeys, $keys{'scertfile'}, $keys{'skeyfile'}, $keys{'sCAfile'});
+$rc=matrixSslReadKeys($smxkeys, $scertfile, $skeyfile, undef, $sCAfile);
 ok($rc==0,'matrixSslReadKeys');
 ok($smxkeys!=0,'matrixSslReadKeys1');
 ok($smxkeys!=333,'matrixSslReadKeys2');
@@ -62,7 +62,7 @@ my $cmxkeys=333;
 $rc=333;
 
 # Read in our keys - not needed for clients who don't validate server certs.
-$rc=Crypt::MatrixSSL::matrixSslReadKeys($cmxkeys, $ccertfile, $ckeyfile, undef, $cCAfile);
+$rc=matrixSslReadKeys($cmxkeys, $ccertfile, $ckeyfile, undef, $cCAfile);
 ok($rc==0,'matrixSslReadKeys');		# test 
 ok($cmxkeys!=0,'matrixSslReadKeys1');	# test
 ok($cmxkeys!=333,'matrixSslReadKeys2');	# test
@@ -79,7 +79,7 @@ my $flags=0; # 0=client, 1=server
 $rc=333;
 
 # Starts a new session (or resume if $sessionId>0) - done anytime a client wants one
-$rc=Crypt::MatrixSSL::matrixSslNewSession($cssl, $cmxkeys, $csessionId, $flags);
+$rc=matrixSslNewSession($cssl, $cmxkeys, $csessionId, $flags);
 ok($rc==0,'matrixSslNewSession');		# test 7
 ok($cssl!=0,'matrixSslNewSession1');		# test 8
 ok($cssl!=333,'matrixSslNewSession2');		# test 9
@@ -87,19 +87,19 @@ ok($csessionId==0,'matrixSslNewSession3');	# test 10
 print "matrixSslNewSession('$cssl', '$cmxkeys', '$csessionId', '$flags') returns '$rc'\n" if($cdbg);
 $rc=333;
 
-Crypt::MatrixSSL::matrixSslSetCertValidator($cssl,0,0);
+matrixSslSetCertValidator($cssl,sub {0},0);
 
 
 # Starts a new server session (or resume if $sessionId>0) - done when a new client connects
-$rc=Crypt::MatrixSSL::matrixSslNewSession($sssl, $smxkeys, $ssessionId, 1);
+$rc=matrixSslNewSession($sssl, $smxkeys, $ssessionId, $SSL_FLAGS_SERVER);
 ok($rc==0,'matrixSslNewSession5');		# test 11
 ok($sssl!=0,'matrixSslNewSession6');		# test 12
 ok($sssl!=333,'matrixSslNewSession7');		# test 13
 ok($ssessionId==0,'matrixSslNewSession8');	# test 14
-print "matrixSslNewSession('$sssl', '$smxkeys', '$ssessionId', 1) returns '$rc'\n"  if($cdbg);
+print "matrixSslNewSession('$sssl', '$smxkeys', '$ssessionId', $SSL_FLAGS_SERVER) returns '$rc'\n"  if($cdbg);
 
 # If wanting to extract cert info, or do more interesting validations, a call to matrixSslSetCertValidator should come next
-Crypt::MatrixSSL::matrixSslSetCertValidator($sssl,0,0);
+matrixSslSetCertValidator($sssl,sub{0},0);
 
 
 
@@ -110,7 +110,7 @@ Crypt::MatrixSSL::matrixSslSetCertValidator($sssl,0,0);
 my($cout);
 $rc=333;
 
-$rc=Crypt::MatrixSSL::matrixSslEncodeClientHello($cssl,$cout,0);
+$rc=matrixSslEncodeClientHello($cssl,$cout,0);
 ok($rc==0,'matrixSslEncodeClientHello');		# test 15
 ok(length($cout)>9,'matrixSslEncodeClientHello1');	# test 16
 print "matrixSslEncodeClientHello('$cssl', '${\showme($cout)}',0) returns '$rc'\n" if($cdbg);
@@ -131,12 +131,12 @@ my $buf='';
 
 
 # Let the client and server talk amongst themselves to establish a connection
-while((($hc=Crypt::MatrixSSL::matrixSslHandshakeIsComplete($sssl))!=1)&&($trymore--)) {
+while((($hc=matrixSslHandshakeIsComplete($sssl))!=1)&&($trymore--)) {
   print "hc=$hc\n"  if($cdbg);
   # Is there stuff from the client to send to the server?
   if(length($cout)) {
     # $sin=$cout; $cout='';
-    $rc=Crypt::MatrixSSL::matrixSslDecode($sssl, $cout, $sout, $error, $alertLevel, $alertDescription);
+    $rc=matrixSslDecode($sssl, $cout, $sout, $error, $alertLevel, $alertDescription);
     if($rc==-1) {
       $trymore=0;
     } else {
@@ -146,7 +146,7 @@ while((($hc=Crypt::MatrixSSL::matrixSslHandshakeIsComplete($sssl))!=1)&&($trymor
   # Is there stuff from the server to send to the client?
   if(length($sout)) {
     # $cin=$sout; $sout='';
-    $rc=Crypt::MatrixSSL::matrixSslDecode($cssl, $sout, $cout, $error, $alertLevel, $alertDescription);
+    $rc=matrixSslDecode($cssl, $sout, $cout, $error, $alertLevel, $alertDescription);
     if($rc==-1) {
       $trymore=0;
     } else {
@@ -157,13 +157,13 @@ while((($hc=Crypt::MatrixSSL::matrixSslHandshakeIsComplete($sssl))!=1)&&($trymor
 
 # We now deliberately check that it knows the handshake is complete
 $rc=333;
-$rc=Crypt::MatrixSSL::matrixSslHandshakeIsComplete($cssl);
+$rc=matrixSslHandshakeIsComplete($cssl);
 ok($rc==1, 'matrixSslHandshakeIsComplete1');						# test x
 print "matrixSslHandshakeIsComplete('$cssl') returns '$rc'\n"  if($cdbg);
 
 # We now deliberately check that it knows the handshake is not complete
 $rc=333;
-$rc=Crypt::MatrixSSL::matrixSslHandshakeIsComplete($sssl);
+$rc=matrixSslHandshakeIsComplete($sssl);
 ok($rc==1, 'matrixSslHandshakeIsComplete2');						# test x
 print "matrixSslHandshakeIsComplete('$sssl') returns '$rc'\n"  if($cdbg);
 
@@ -173,14 +173,14 @@ print "matrixSslHandshakeIsComplete('$sssl') returns '$rc'\n"  if($cdbg);
 $rc=333;
 $cin="Hello Me!\000\r\n";
 $cout='';
-$rc=Crypt::MatrixSSL::matrixSslEncode($cssl, $cin, $cout);	# compose msg
-# ok($rc==Crypt::MatrixSSL::mxSSL_SEND_RESPONSE,'matrixSslDecode');		# test 17
+$rc=matrixSslEncode($cssl, $cin, $cout);	# compose msg
+# ok($rc==$SSL_SEND_RESPONSE,'matrixSslDecode');		# test 17
 ok($rc>=0,'matrixSslEecode');		# test 17
 ok(length($cout)>0,'matrixSslEecode1');	# test 18
 print "matrixSslEncode('$cssl', '${\showme($cin)}', '${\showme($cout)}') returns '$rc'\n"  if($cdbg);
-$rc=Crypt::MatrixSSL::matrixSslDecode($sssl, $cout, $sout, $error, $alertLevel, $alertDescription); # send it
-ok($rc==Crypt::MatrixSSL::mxSSL_PROCESS_DATA,'matrixSslDecde');		# test 17
-ok($sout eq "Hello Me!\000\r\n", 'encode');
+$rc=matrixSslDecode($sssl, $cout, $sout, $error, $alertLevel, $alertDescription); # send it
+ok($rc==$SSL_PROCESS_DATA,'matrixSslDecde');		# test 17
+is($sout, "Hello Me!\000\r\n", 'encode');
 print "Server got $sout\n" if($cdbg);
 
 
@@ -188,21 +188,21 @@ print "Server got $sout\n" if($cdbg);
 $rc=333;
 $sin="Hi Back!\000\n\r";
 $sout='';
-$rc=Crypt::MatrixSSL::matrixSslEncode($sssl, $sin, $sout);
-# ok($rc==Crypt::MatrixSSL::mxSSL_SEND_RESPONSE,'matrixSslDecode');		# test 17
+$rc=matrixSslEncode($sssl, $sin, $sout);
+# ok($rc==$SSL_SEND_RESPONSE,'matrixSslDecode');		# test 17
 ok($rc>=0,'matrixSslEecode');		# test 17
 ok(length($sout)>0,'matrixSslEecode1');	# test 18
 print "matrixSslEncode('$sssl', '${\showme($sin)}', '${\showme($sout)}') returns '$rc'\n" if($cdbg);
-$rc=Crypt::MatrixSSL::matrixSslDecode($cssl, $sout, $cout, $error, $alertLevel, $alertDescription); # send it
-ok($rc==Crypt::MatrixSSL::mxSSL_PROCESS_DATA,'matrixSslDecde');		# test 17
-ok($cout eq "Hi Back!\000\n\r", 'encode');
+$rc=matrixSslDecode($cssl, $sout, $cout, $error, $alertLevel, $alertDescription); # send it
+ok($rc==$SSL_PROCESS_DATA,'matrixSslDecde');		# test 17
+is($cout, "Hi Back!\000\n\r", 'encode');
 print "Server got $cout\n" if($cdbg);
 
 
 
 $rc=333;
 $cout='';
-$rc=Crypt::MatrixSSL::matrixSslGetSessionId($cssl, $cout);
+$rc=matrixSslGetSessionId($cssl, $cout);
 ok($rc==0,'matrixSslGetSessionId');		# test
 ok($cout ne '','matrixSslGetSessionId');		# test
 ok($cout!=0,'matrixSslGetSessionId');		# test
@@ -210,16 +210,16 @@ print "\n\n\nmatrixSslGetSessionId($cssl, $cout)=$rc\n" if($cdbg);
 
 
 $rc=333;
-Crypt::MatrixSSL::matrixSslFreeSessionId($cout);
+matrixSslFreeSessionId($cout);
 print "matrixSslFreeSessionId($cout)=$rc\n"  if($cdbg);
 
 
 $rc=333;
 $cout='';
-$rc=Crypt::MatrixSSL::matrixSslEncodeClosureAlert($cssl, $cout);
+$rc=matrixSslEncodeClosureAlert($cssl, $cout);
 print "matrixSslEncodeClosureAlert($cssl, $cout)='$rc'\n"  if($cdbg);
-$rc=Crypt::MatrixSSL::matrixSslDecode($sssl, $cout, $sout, $error, $alertLevel, $alertDescription); # send it
-ok($rc==Crypt::MatrixSSL::mxSSL_ALERT,'matrixSslFreeSessionId');		# test
+$rc=matrixSslDecode($sssl, $cout, $sout, $error, $alertLevel, $alertDescription); # send it
+ok($rc==$SSL_ALERT,'matrixSslFreeSessionId');		# test
 
 
 
@@ -228,25 +228,25 @@ ok($rc==Crypt::MatrixSSL::mxSSL_ALERT,'matrixSslFreeSessionId');		# test
 
 # Clear up the finished session now
 $rc=333;
-$rc=Crypt::MatrixSSL::matrixSslDeleteSession($cssl);
+$rc=matrixSslDeleteSession($cssl);
 ok($rc==0,'matrixSslDeleteSession');		# test ??
 print "matrixSslDeleteSession($cssl)='$rc'\n"  if($cdbg);
 
 $rc=333;
-$rc=Crypt::MatrixSSL::matrixSslDeleteSession($sssl);
+$rc=matrixSslDeleteSession($sssl);
 ok($rc==0,'matrixSslDeleteSession2');		# test ??
 print "matrixSslDeleteSession($sssl)='$rc'\n"  if($cdbg);
 
 
 
 # Free our keys
-$rc=Crypt::MatrixSSL::matrixSslFreeKeys($smxkeys);
+$rc=matrixSslFreeKeys($smxkeys);
 print "matrixSslFreeKeys($smxkeys)=$rc\n"  if($cdbg);
-$rc=Crypt::MatrixSSL::matrixSslFreeKeys($cmxkeys);
+$rc=matrixSslFreeKeys($cmxkeys);
 print "matrixSslFreeKeys($cmxkeys)=$rc\n"  if($cdbg);
 
 # Tidy up
-Crypt::MatrixSSL::matrixSslClose();
+matrixSslClose();
 
 
 SKIP: { skip "online tests are not enabled", 1 unless -e 't/online.enabled';
@@ -312,10 +312,10 @@ sub online_test {
 
 $flags=0;
 
-$rc=Crypt::MatrixSSL::matrixSslOpen();
-$rc=Crypt::MatrixSSL::matrixSslReadKeys($cmxkeys, $ccertfile, $ckeyfile, undef, $cCAfile);
-$rc=Crypt::MatrixSSL::matrixSslNewSession($cssl, $cmxkeys, $csessionId, $flags);
-Crypt::MatrixSSL::matrixSslSetCertValidator($cssl,0,0);
+$rc=matrixSslOpen();
+$rc=matrixSslReadKeys($cmxkeys, $ccertfile, $ckeyfile, undef, $cCAfile);
+$rc=matrixSslNewSession($cssl, $cmxkeys, $csessionId, $flags);
+matrixSslSetCertValidator($cssl,sub{0},0);
 
 
 $host="www.google.com:443";
@@ -324,23 +324,23 @@ diag "Connecting to https://$host/ ...";
 $remote=new IO::Socket::INET(PeerAddr=>$host,Proto=>'tcp') || return 0; # die "sock:$!"; # Connect to a server
 
 diag "Writing hello ...";
-$rc=Crypt::MatrixSSL::matrixSslEncodeClientHello($cssl,$cout,0);if($rc){die "hello fail";} # in SSL, Clients talk 1st
+$rc=matrixSslEncodeClientHello($cssl,$cout,0);if($rc){die "hello fail";} # in SSL, Clients talk 1st
 
 # SSL connections require some back-and-forth chatskis - this loop feeds MatrixSSL with the data until it says we're connected OK.
 diag "SSL Handshaking ...";
-my($decodeRc)=Crypt::MatrixSSL::mxSSL_PARTIAL;
-while(($hc=Crypt::MatrixSSL::matrixSslHandshakeIsComplete($cssl))!=1) {
+my($decodeRc)=$SSL_PARTIAL;
+while(($hc=matrixSslHandshakeIsComplete($cssl))!=1) {
   print "shake complete=$hc decodeRc=$decodeRc cin_len=" . length($cin) . " cout_len=" . length($cout) . "\n";
-  # if(($decodeRc==Crypt::MatrixSSL::mxSSL_SEND_RESPONSE)&&(length($cout)>0)) { # -4
+  # if(($decodeRc==$SSL_SEND_RESPONSE)&&(length($cout)>0)) { # -4
   if(length($cout)>0) {
     $b=syswrite($remote,$cout); die "Socket error: $!" unless(defined($b));
     $cout=substr($cout,$b); print "wrote bytes=$b, new cout_len=" . length($cout) . "\n";
   }
-  if(($decodeRc==Crypt::MatrixSSL::mxSSL_PARTIAL)||($decodeRc==Crypt::MatrixSSL::mxSSL_SEND_RESPONSE)) { # -3
+  if(($decodeRc==$SSL_PARTIAL)||($decodeRc==$SSL_SEND_RESPONSE)) { # -3
     $buf='';$b=sysread($remote,$buf,17000);$cin.=$buf;
     print "Read bytes=$b new cin_len=" .length($cin) . " got: '${\showme($buf)}'\n"; $buf='';
   } else {
-    print "'$decodeRc' != ' " . Crypt::MatrixSSL::mxSSL_PARTIAL . "'\n";
+    print "'$decodeRc' != ' " . $SSL_PARTIAL . "'\n";
   }
   # elsif($prevcin eq $cin) { # These 6 lines contributed by Alex Efros
   #  $b=sysread($remote,$cin2,17000);
@@ -351,14 +351,14 @@ while(($hc=Crypt::MatrixSSL::matrixSslHandshakeIsComplete($cssl))!=1) {
 
   $decodeRc=-100;
 
-  while( ($decodeRc==-100) || (($decodeRc==0)&&(length($cin)>0))) { # !=Crypt::MatrixSSL::mxSSL_PARTIAL) { # -3  length($cin)>0) { #}
-  # while($decodeRc==0) { # !=Crypt::MatrixSSL::mxSSL_PARTIAL) { # -3  length($cin)>0) { #}
+  while( ($decodeRc==-100) || (($decodeRc==0)&&(length($cin)>0))) { # !=$SSL_PARTIAL) { # -3  length($cin)>0) { #}
+  # while($decodeRc==0) { # !=$SSL_PARTIAL) { # -3  length($cin)>0) { #}
     #print "cin len=" . length($cin) . "\n";
-    $decodeRc=Crypt::MatrixSSL::matrixSslDecode($cssl, $cin, $buf, $error, $alertLevel, $alertDescription);
+    $decodeRc=matrixSslDecode($cssl, $cin, $buf, $error, $alertLevel, $alertDescription);
     print "matrixSslDecode rc=$decodeRc($Crypt::MatrixSSL::mxSSL_RETURN_CODES{$decodeRc}) cin_len=" . length($cin) . " cout_len=" . length($cout);
     $cout.=$buf; $buf='';
     # Need to end if $rc hit an error
-    if($decodeRc){ print " err=$error ($Crypt::MatrixSSL::mxSSL_ALERT_CODES{$error})"}; print "\n";
+    if($decodeRc){ print " err=$error ($SSL_alertDescription{$error})"}; print "\n";
     die "oops" if($l++>20);
   }
   die "oops" if($l++>20);
@@ -367,7 +367,7 @@ while(($hc=Crypt::MatrixSSL::matrixSslHandshakeIsComplete($cssl))!=1) {
 
 # Our client is now going to send a message to the server
 diag "Requesting page ...";
-$rc=Crypt::MatrixSSL::matrixSslEncode($cssl, "GET / HTTP/1.1\r\nAccept: */*\r\nUser-Agent: Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1)\r\nHost: $host\r\n\r\n", $cout);
+$rc=matrixSslEncode($cssl, "GET / HTTP/1.1\r\nAccept: */*\r\nUser-Agent: Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1)\r\nHost: $host\r\n\r\n", $cout);
 syswrite($remote,$cout); print "wrote bytes=" . length($cout) . "\n" if(length($cout));
 
 
@@ -376,7 +376,7 @@ diag "Reading response ...";
 $b=sysread($remote,$cin,17000); print "Read bytes=$b '${\showme($cin)}'\n";
 
 # Decrypt what it said:-
-$rc=Crypt::MatrixSSL::matrixSslDecode($cssl, $cin, $cout, $error, $alertLevel, $alertDescription);
+$rc=matrixSslDecode($cssl, $cin, $cout, $error, $alertLevel, $alertDescription);
 print "Read($rc): '$cout'\n";
 
 my $ret=0;
@@ -384,15 +384,15 @@ $ret=1 if($cout=~/^(Content-Type:|Location:)/im);
 
 
 # Tell google we're about to go away now
-$rc=Crypt::MatrixSSL::matrixSslEncodeClosureAlert($cssl, $cout);
+$rc=matrixSslEncodeClosureAlert($cssl, $cout);
 syswrite($remote,$cout); print "wrote bytes=" . length($cout) . "\n" if(length($cout));
 
 
 # Clear up the finished session now
-$rc=Crypt::MatrixSSL::matrixSslDeleteSession($cssl);
+$rc=matrixSslDeleteSession($cssl);
 
 # Free our keys
-$rc=Crypt::MatrixSSL::matrixSslFreeKeys($cmxkeys);
+$rc=matrixSslFreeKeys($cmxkeys);
 
 return $ret; # Worked
 
