@@ -105,3 +105,13 @@ matrixssl-1-8-3-open.files	for building older versions
 matrixssl-1-8-6-open.files	for building older versions
 ca-certificates.crt		Bundle of current CA certs in common browsers
 Crypt-MatrixSSL.ppd		Info for the Windows precompiled PPM version (see also ../blib/*)
+ppmblib/arch/auto/Crypt/MatrixSSL/MatrixSSL.dll	Precompiled PPM MSWin32 binary
+ppmblib/arch/auto/Crypt/MatrixSSL/MatrixSSL.exp
+ppmblib/arch/auto/Crypt/MatrixSSL/MatrixSSL.lib
+ppmblib/arch/auto/Crypt/MatrixSSL/MatrixSSL.bs
+ppmblib/lib/Crypt/sample_ssl_server.pl
+ppmblib/lib/Crypt/mxgg.pl
+ppmblib/lib/Crypt/MatrixSSL.pm
+ppmblib/lib/Crypt/sample_functions.pl
+ppmblib/lib/Crypt/sample_ssl_client.pl
+ppmhtml/site/lib/Crypt/MatrixSSL.html
